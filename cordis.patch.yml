@@ -1,0 +1,5 @@
+# dsh-isolation-box bundle patch：把隔离箱挂进 profile 的 Loader。
+# 插件本体是零依赖挂载点（lib/index.js），工具集随包分发（scripts/）。
+- insert:
+    - id: isolation-box
+      name: 'dsh-isolation-box'

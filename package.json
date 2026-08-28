@@ -1,0 +1,27 @@
+{
+  "name": "dsh-isolation-box",
+  "version": "0.1.2",
+  "description": "隔离箱：DSH 插件调试隔离框架（进程隔离/看门狗/熔断/验收/启动守卫/发布预检）",
+  "keywords": ["dsh", "dsh-plugin", "isolation", "sandbox", "debug", "cordis"],
+  "author": "dsh-isolation-box",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "lib",
+    "scripts",
+    "docs",
+    "README.md",
+    "SAFETY.md",
+    "cordis.patch.yml"
+  ]
+}
