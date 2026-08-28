@@ -19,7 +19,7 @@ import sys
 import time
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-# 实例根目录：默认 /root/project/instances，可用环境变量覆盖（他人部署免改源码）
+# 实例根目录：默认 ~/project/instances，可用 $DSH_INSTANCES_ROOT 覆盖（他人部署免改源码）
 INSTANCES_ROOT = os.environ.get("DSH_INSTANCES_ROOT", "/root/project/instances")
 RUNNER = os.path.join(BASE, "instance_runner.py")
 
@@ -78,11 +78,13 @@ def tail(path, n=200):
 
 
 def open_browser(url):
-    """自动调起手机浏览器打开指定 URL（DSHA 桥，零配置）。"""
+    """自动调起移动端浏览器打开指定 URL（DSH 桥，零配置；缺失时打印手动地址）。"""
     try:
         import urllib.parse
         import urllib.request
-        tok = open("/root/.dsh/.bridge_token").read().strip()
+        tok_file = os.environ.get("DSH_TOKEN_FILE") or os.path.join(
+            os.environ.get("DSH_HOME", "/root/.dsh"), ".bridge_token")
+        tok = open(tok_file).read().strip()
         q = urllib.parse.urlencode({"url": url, "token": tok})
         urllib.request.urlopen("http://127.0.0.1:3090/app/open?" + q, timeout=5)
         print(f"[supervisor] 🖥 浏览器已自动打开: {url}")

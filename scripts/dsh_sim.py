@@ -9,7 +9,7 @@ import sys
 import time
 
 # 与 dsh_guard.py / demo_story.py 的 SIM 约定保持一致：基于自身文件位置，
-# 而不是写死 /root/project/...（解压到任何目录都能跑，README 的演示才成立）
+# 而不是写死固定绝对路径（解压到任何目录都能跑，README 的演示才成立）
 SIM_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".sim")
 READY = os.path.join(SIM_DIR, "READY")
 COUNTER = os.path.join(SIM_DIR, "start_count.txt")

@@ -17,18 +17,19 @@ import subprocess
 import sys
 import time
 
-HOME = "/root/.dsh"
+HOME = os.environ.get("DSH_HOME", "/root/.dsh")
 PROFILES = os.path.join(HOME, "profiles")
 TEMPLATE = os.path.join(PROFILES, "web")          # 主 profile 模板（参考）
 REG = os.path.join(HOME, ".dsh-tool-registry.json")
 DSH_BIN = "/usr/local/lib/node_modules/@deepseek-ai/dsh/lib/bin.js"
-LOG_DIR = "/root/.dsh-tool-logs"
+LOG_DIR = os.environ.get("DSH_TOOL_LOG_DIR", os.path.expanduser("~/.dsh-tool-logs"))
 USER_PLUGINS = ["dsh-device-shell-guide", "dsh-status-overlay", "dsh-task-notifier"]
 
 
 def token():
     try:
-        return open(os.path.join(HOME, ".bridge_token")).read().strip()
+        tok_file = os.environ.get("DSH_TOKEN_FILE") or os.path.join(HOME, ".bridge_token")
+        return open(tok_file).read().strip()
     except Exception:
         return ""
 
@@ -54,7 +55,7 @@ def url_of(port):
 
 
 def open_browser(url):
-    """自动调起手机浏览器打开 URL（DSHA 桥）。"""
+    """自动调起移动端浏览器打开 URL（DSH 桥；缺失时打印手动地址）。"""
     try:
         import urllib.parse
         import urllib.request
@@ -91,8 +92,9 @@ def mk_profile(name):
             os.symlink(src, dest)
     os.makedirs(os.path.join(nm, "@dsh-external"), exist_ok=True)
     mobile = os.path.join(nm, "@dsh-external", "dsh-mobile-nav")
-    if not os.path.exists(mobile) and os.path.isdir("/root/dsha-mobile-nav"):
-        os.symlink("/root/dsha-mobile-nav", mobile)
+    mobile_src = os.environ.get("DSH_MOBILE_NAV_SRC", "/root/dsha-mobile-nav")
+    if not os.path.exists(mobile) and os.path.isdir(mobile_src):
+        os.symlink(mobile_src, mobile)
     return d
 
 
@@ -127,7 +129,7 @@ def cmd_up(args):
     print(f"[dsh-tool] {name}: 已拉起 pid={proc.pid} 端口={args.port}（等待就绪…）")
     if wait_ready(args.port):
         print(f"[dsh-tool] ✅ {name} 就绪！浏览器访问: {url_of(args.port)}")
-        print("  手机浏览器打开后即为完整 DSH 界面；可小窗悬浮围观")
+        print("  移动端浏览器打开后即为完整 DSH 界面；可小窗悬浮围观")
         if not getattr(args, "no_open", False):
             open_browser(url_of(args.port))
     else:
@@ -185,7 +187,7 @@ def cmd_publish(args):
         shutil.rmtree(work)
     os.makedirs(work)
     shutil.copytree(src, os.path.join(work, name))     # 顶层目录名 = 包名（App 注册名规则）
-    tarball = os.path.join("/sdcard/Download", f"{name}-v{args.version}.tar.gz")
+    tarball = os.path.join(os.environ.get("DSH_EXPORT_DIR", "/sdcard/Download"), f"{name}-v{args.version}.tar.gz")
     r = subprocess.run(["tar", "-C", work, "-czf", tarball, name], capture_output=True, text=True)
     if r.returncode != 0:
         print(f"[publish] ❌ 打包失败: {r.stderr[-200:]}")

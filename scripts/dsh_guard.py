@@ -7,8 +7,8 @@
 真实 DSH 用法示例（实现后）:
   python3 dsh_guard.py start --cmd "dsh web" --ready "..."
 模拟演示（本期已验证）:
-  python3 dsh_guard.py start --cmd 'python3 /root/project/plugins-framework/dsh_sim.py --fail-once'
-  python3 dsh_guard.py start --cmd 'python3 /root/project/plugins-framework/dsh_sim.py --fail-always'
+  python3 dsh_guard.py start --cmd 'python3 ~/project/plugins-framework/dsh_sim.py --fail-once'
+  python3 dsh_guard.py start --cmd 'python3 ~/project/plugins-framework/dsh_sim.py --fail-always'
 """
 import argparse
 import os

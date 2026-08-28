@@ -114,7 +114,8 @@ def main():
             try:
                 # 把解压出的包按「App 语义」装进临时 profile
                 import shutil
-                prof = "/root/.dsh/profiles/precheck"
+                dsh_home = os.environ.get("DSH_HOME", "/root/.dsh")
+                prof = os.path.join(dsh_home, "profiles", "precheck")
                 if os.path.isdir(prof):
                     shutil.rmtree(prof)
                 os.makedirs(os.path.join(prof, "node_modules"), exist_ok=True)
@@ -127,7 +128,7 @@ def main():
                     json.dump(pj, f, indent=2)
                 for fn in ("pnpm-workspace.yaml", ".npmrc"):
                     # 模板 profile 不一定有 .npmrc（web profile 实测缺失）——存在才拷，缺失不阻塞预演
-                    srcf = "/root/.dsh/profiles/web/" + fn
+                    srcf = os.path.join(dsh_home, "profiles", "web", fn)
                     if os.path.exists(srcf):
                         shutil.copy(srcf, os.path.join(prof, fn))
                 # 真 boot（--port 0 随机，--no-open）：就绪检测 = 日志出现 "dsh web: http"

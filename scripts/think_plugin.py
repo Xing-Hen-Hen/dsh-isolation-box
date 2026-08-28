@@ -8,7 +8,7 @@ import sys
 # ---------- 夹具：真实思考链的格式缩影（schema 契约） ----------
 FIXTURE = {
     "thoughts": [
-        {"id": "t1", "role": "user", "depth": 0, "content": "用户在问手机方案"},
+        {"id": "t1", "role": "user", "depth": 0, "content": "用户在问部署方案"},
         {"id": "t2", "role": "internal", "depth": 1, "content": "先体检环境再设计"},
         {"id": "t3", "role": "internal", "depth": 2, "content": "seccomp 禁了 unshare"},
         {"id": "t4", "role": "internal", "depth": 2, "content": "进程级隔离依然可行"},

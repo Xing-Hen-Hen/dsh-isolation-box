@@ -11,7 +11,7 @@ import subprocess
 import sys
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-ROOT = "/root/project"
+ROOT = os.environ.get("DSH_PROJECT_ROOT", os.path.expanduser("~/project"))
 INSTANCES = os.path.join(ROOT, "instances")
 SIM = os.path.join(BASE, ".sim")
 

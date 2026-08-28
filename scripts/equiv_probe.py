@@ -33,10 +33,12 @@ def probe():
     # 4) 环境变量面
     keys = sorted(k for k in ("PATH", "PYTHONPATH", "HOME", "LANG", "SHELL", "TERM") if k in __import__("os").environ)
     info["env_keys"] = keys
-    # 5) 接口面：DSH 桥可达性
+    # 5) 接口面：DSH 桥可达性（可选，缺失时记 FAIL 不中断）
     try:
         import urllib.request
-        tok = open("/root/.dsh/.bridge_token").read().strip()
+        tok_file = os.environ.get("DSH_TOKEN_FILE") or os.path.join(
+            os.environ.get("DSH_HOME", "/root/.dsh"), ".bridge_token")
+        tok = open(tok_file).read().strip()
         r = urllib.request.urlopen(
             "http://127.0.0.1:3090/app/device?token=" + tok, timeout=5)
         info["dsh_bridge"] = "可达" + r.read().decode()[:60]

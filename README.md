@@ -1,7 +1,7 @@
 # DSH 多实例插件框架 · 使用手册
 
-> 手机容器版（vivo V2359A / Android 16 / Ubuntu 24.04）· 零第三方依赖 · 全部标准库
-> 设计文档：`/root/project/docs/multi-instance-plugin-design.md`
+> 零第三方依赖 · 全部标准库 · 已在 Ubuntu 24.04 (aarch64) / Python 3.12+ / Node 24+ 验证
+> 设计文档：`docs/multi-instance-plugin-design.md`
 
 ## 一、组成
 
@@ -32,7 +32,7 @@ python3 supervisor.py supervise --specs demo1=plugin_demo.py
 # 闸① 验收：实例环境冒烟测试，通过才允许替换正式插件目录
 python3 supervisor.py approve <待验收插件.py>        # 退出码 0=通过
 
-# 浏览器看板（手机浏览器 http://127.0.0.1:8765/，可悬浮小窗）
+# 浏览器看板（移动端浏览器 http://127.0.0.1:8765/，可悬浮小窗）
 python3 supervisor.py board
 
 # 查看状态 / 崩溃日志 / 强杀 / 人工禁用
@@ -66,7 +66,7 @@ python3 dsh_tool.py down <name>               # 停止实例
 python3 dsh_tool.py status                    # 列出实例（端口/PID/访问URL）
 ```
 
-访问 URL 已自动附 `?dsha_t=<token>` 通行证（DSHA 对 web 服务的 token 鉴权，浏览器直达既安全又免配置）。
+访问 URL 已自动附鉴权通行证（对 web 服务的 token 鉴权，浏览器直达既安全又免配置）。
 
 **已验证**：test-live(3081)/test-2(3082) 并行运行，HTML + `/plugins/` 客户端插件均 200，界面与主实例一致。
 
@@ -116,3 +116,10 @@ python3 dsh_tool.py publish --src <插件源码目录> --name <包名> --version
 4. 启动守卫：启动失败 → 自动回滚重试成功；回滚也失败 → 安全模式必起
 
 期间还抓到并修复了 2 个真实 bug（线程写竞态、CSS 花括号格式化），充分说明「崩溃现场取证 → 修复 → 重跑」链路好用。
+
+## 九、环境要求
+
+- **操作系统**：Linux（aarch64 / x86_64），已在 Ubuntu 24.04 aarch64 验证
+- **Python**：3.12+（标准库，零第三方依赖）
+- **Node.js**：24+（`dsh_tool.py` 完整 DSH 实例层使用）
+- **可选**：DSH 桥接通道（`/app/*`）用于自动打开浏览器/看板；缺失时工具自动降级为打印访问地址，功能不受影响

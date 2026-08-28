@@ -22,13 +22,13 @@
 | 主 profile | `~/.dsh/profiles/web/`（只读参考） | 用户实例的根,只 allow 只读 |
 | 用户层配置 | `~/.dsh/cordis.patch.yml`（备份在 `~/.dsh/backups/`） | 改它会影响主实例行为 |
 | 会话库 | `~/.dsh/sessions/` | 用户历史对话 |
-| 设备系统/Android 侧 | 一律走 App 层接口或 adb-shell（用户确认） | 越过 = 违规 |
+| 设备系统侧 | 一律走 App 层接口或 adb-shell（用户确认） | 越过 = 违规 |
 
 ## 二、危险操作规范（每一条都是「防自杀」）
 
 1. **杀进程**：先 `pgrep -f` 打印**完整清单**并人工核对 → 必须用带正则防自匹配的 pattern（如 `pgrep -f "lib/bin[.]js --profile test-2"`）→ 确认 pid 后再 kill。**禁止**裸 `pkill -f xxx`（曾 2 次自杀,血泪）
-2. **删除/移动**：路径限定在 `/root/project/plugins-framework/`、`/root/project/instances/`、`~/.dsh/profiles/test-*` 内；删前 `.git status` 或 `ls` 确认
-3. **修改宿主文件**：先 `cp` 到 `/root/.dsh/backups/` 再改
+2. **删除/移动**：路径限定在 `~/project/plugins-framework/`、`~/project/instances/`、`$DSH_HOME/profiles/test-*` 内；删前 `.git status` 或 `ls` 确认
+3. **修改宿主文件**：先 `cp` 到 `$DSH_HOME/backups/` 再改
 4. **重启生效类**：只有「验收通过（approve 冒烟 + 一致性）」才允许替换=重启 = 走 `dsh_tool.py` / `dsh_guard.py`,不裸跑
 5. **设备命令**：先报备,走确认通道,不绕过
 
@@ -36,18 +36,18 @@
 
 | 档 | 手段 | 命令 |
 |---|---|---|
-| 框架文件改坏 | git 回滚 | `cd /root/project/plugins-framework && git checkout -- .` |
+| 框架文件改坏 | git 回滚 | `cd ~/project/plugins-framework && git checkout -- .` |
 | 测试实例搞坏 | 重建实例 | `dsh_tool.py down x && dsh_tool.py up x --port 3083` |
-| 宿主配置改坏 | 备份恢复 | `cp /root/.dsh/backups/cordis.patch.yml.bak-* ~/.dsh/cordis.patch.yml` |
+| 宿主配置改坏 | 备份恢复 | `cp $DSH_HOME/backups/cordis.patch.yml.bak-* $DSH_HOME/cordis.patch.yml` |
 
 ## 四、验证过的「安全圈」结构
 
 ```
 可自由操作区（调试战场）:
-  /root/project/plugins-framework/   ← git 仓库,任何破坏可回滚
-  /root/project/instances/            ← 实例数据,可整体重建
-  ~/.dsh/profiles/test-*/             ← 测试 profile,可重建
-  ~/.dsh/profiles/web/node_modules/.ignored_*  ← 只读参考源
+  ~/project/plugins-framework/   ← git 仓库,任何破坏可回滚
+  ~/project/instances/            ← 实例数据,可整体重建
+  $DSH_HOME/profiles/test-*/             ← 测试 profile,可重建
+  $DSH_HOME/profiles/web/node_modules/.ignored_*  ← 只读参考源
 不可碰区（宿主）:
   主进程 / web profile / cordis.patch.yml / sessions
 ```
