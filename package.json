@@ -1,6 +1,6 @@
 {
   "name": "dsh-isolation-box",
-  "version": "0.1.3-beta.2",
+  "version": "0.1.3-beta.3",
   "description": "隔离箱：DSH 插件调试隔离框架（进程隔离/看门狗/熔断/验收/启动守卫/发布预检）",
   "keywords": [
     "dsh",
