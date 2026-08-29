@@ -3,7 +3,16 @@
   "version": "0.1.2",
   "description": "隔离箱：DSH 插件调试隔离框架（进程隔离/看门狗/熔断/验收/启动守卫/发布预检）",
   "keywords": ["dsh", "dsh-plugin", "isolation", "sandbox", "debug", "cordis"],
-  "author": "dsh-isolation-box",
+  "author": "Xing-Hen-Hen",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Xing-Hen-Hen/dsh-isolation-box.git"
+  },
+  "homepage": "https://github.com/Xing-Hen-Hen/dsh-isolation-box#readme",
+  "bugs": {
+    "url": "https://github.com/Xing-Hen-Hen/dsh-isolation-box/issues"
+  },
   "type": "module",
   "main": "lib/index.js",
   "exports": {

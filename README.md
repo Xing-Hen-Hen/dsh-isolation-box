@@ -44,15 +44,15 @@ python3 supervisor.py board
 
 ## 📦 安装为 DSH 插件
 
-**正式安装**（一条命令，固定版本，可复现、可回滚）：
+已发布到 npm registry，一条命令：
 
 ```bash
-dsh plugin --profile web add github:Xing-Hen-Hen/dsh-isolation-box#v0.1.2
+dsh plugin --profile web add dsh-isolation-box
 ```
 
-`main` 分支为开发分支，发布物不稳定，不提供安装命令；如需最新开发版或自行修改，可 clone 仓库后本地使用。
-
 安装后重启 DSH Web Host 生效。插件本体是零依赖挂载点（`lib/index.js`），只打印挂载日志；工具集（`scripts/`）按需运行，**默认 0 进程静默待命**。（DSHA 用户也可在 App「插件」页直接导入发布物。）
+
+`main` 分支为开发分支，发布物不稳定，不提供安装命令；如需最新开发版或自行修改，可 clone 仓库后本地使用。
 
 ## 🛠️ 命令速查
 
