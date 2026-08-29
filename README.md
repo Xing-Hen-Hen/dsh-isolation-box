@@ -100,7 +100,7 @@ DSH 自身**没有会话备份能力**（只备份插件/配置清单）。本�
 ```
 
 - **备份目录**（DSHA 下载目录下两个子文件夹，必须执行规则见 SAFETY.md）：
-  - `auto-backups/` —— 隔离箱启动/触发时自动备份（reason=`supervisor:*`；**内容 = 完整备份**：会话+配置+插件清单，与 `backup.py dsh` 一致，恢复数据用）
+  - `auto-backups/` —— 隔离箱启动/触发时自动备份（reason=`supervisor:*`；**内容 = 程序级完整备份**：整个 `.dsh` 打包成 tar.gz，与 DSHA 工作区备份同构，程序损坏时用最新自动备份恢复程序；排除自身 backups 防膨胀）
   - `session-logs/` —— backup.py 显式备份 / finalize / safe_restart
   - 两类备份**发生时都会明确打印备份目录与还原方法**；每类保留最近 5 份；父目录可用 `DSH_BACKUP_ROOT` 覆盖
   - `tools/` —— 恢复工具独立副本（backup.py + session_guard.py，每次运行自动同步）：程序/插件损坏时也可直接从 sdcard 运行恢复

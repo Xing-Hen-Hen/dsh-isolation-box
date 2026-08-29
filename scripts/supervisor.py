@@ -382,13 +382,13 @@ th{color:#aaa;border:1px solid #333;padding:6px}td{border:1px solid #333;padding
 def auto_backup(reason="supervisor"):
     """启动时默认自动备份（--no-backup 可关），存入「自动备份」子目录。
 
-    内容 = backup.py dsh 完整备份（会话 + 配置 settings.yaml + 插件清单），
-    与 dsh 完整备份一致，用于恢复数据。明确打印备份目录与还原方法（必须告知用户）。
+    内容 = 程序级完整备份（整个 $DSH_HOME 打包，同 DSHA 工作区备份），
+    程序损坏时用最新自动备份恢复程序。明确打印备份目录与还原方法（必须告知用户）。
     """
     try:
         r = subprocess.run([sys.executable, os.path.join(BASE, "backup.py"),
-                            "dsh", "--reason", reason, "--auto"],
-                           capture_output=True, text=True, timeout=120)
+                            "full", "--reason", reason, "--auto"],
+                           capture_output=True, text=True, timeout=300)
         for line in (r.stdout or "").splitlines():
             if line.startswith("[backup]") or line.startswith("BACKUP_DIR="):
                 print(line, flush=True)

@@ -330,6 +330,42 @@ def copy_cfg(dst):
     return n
 
 
+def cmd_full(args):
+    """程序级完整备份：打包整个 $DSH_HOME（.dsh，含插件/node_modules）成 tar.gz，
+    内容与 DSHA「工作区备份」一致——程序损坏时用自动备份（最新）恢复程序。
+
+    排除 backups/corrupt-backup 防止递归膨胀；sessions 软链按链接保留（与 DSHA 一致）。
+    """
+    name = "dsh-full-" + now_ts()
+    root = backup_root(True)
+    os.makedirs(root, exist_ok=True)
+    dst_dir = os.path.join(root, name)          # 目录结构与 sessions/dsh 一致
+    os.makedirs(dst_dir)
+    tarball = os.path.join(dst_dir, name + ".tar.gz")
+    parent = os.path.dirname(os.path.abspath(DSH_HOME))
+    base = os.path.basename(os.path.abspath(DSH_HOME))
+    excl = ["--exclude=%s" % os.path.join(base, "backups"),
+            "--exclude=%s" % os.path.join(base, "corrupt-backup")]
+    r = subprocess.run(["tar", "-czf", tarball] + excl +
+                       ["-C", parent, base], capture_output=True, text=True)
+    if r.returncode != 0 or not os.path.isfile(tarball):
+        print("❌ 程序级备份失败: %s" % (r.stderr or "")[-200:])
+        return 1
+    size = os.path.getsize(tarball) / 1024.0 / 1024.0
+    man = {"kind": "dsh-full", "name": name, "ts": now_ts(),
+           "reason": args.reason or "", "sub": AUTO_SUBDIR,
+           "size_mb": round(size, 1), "restore": "解压 tar.gz 到 %s 覆盖" % DSH_HOME}
+    with open(os.path.join(dst_dir, "manifest.json"), "w") as f:
+        json.dump(man, f, ensure_ascii=False, indent=1)
+    keep_prune("dsh-full", root)
+    write_folder_readme(root, AUTO_SUBDIR)
+    if getattr(args, "auto", False):
+        write_manual()
+    log("[backup] ✅ 程序级完整备份 → %s （%.1f MB）" % (tarball, size))
+    print("BACKUP_DIR=%s" % tarball)
+    return 0
+
+
 def cmd_sessions(args):
     name = "sessions-" + now_ts()
     root = backup_root(getattr(args, "auto", False))
@@ -524,10 +560,14 @@ def main():
     p.add_argument("--reason", default="", help="备份说明")
     p.add_argument("--auto", action="store_true", help="隔离箱启动自动备份 → 自动备份 子目录")
     p.set_defaults(fn=cmd_sessions)
-    p = sub.add_parser("dsh", help="完整备份（会话+配置+插件清单）→ 会话日志 子目录")
+    p = sub.add_parser("dsh", help="数据备份（会话+配置+插件清单）→ 会话日志 子目录")
     p.add_argument("--reason", default="", help="备份说明")
     p.add_argument("--auto", action="store_true", help="隔离箱启动自动备份 → 自动备份 子目录")
     p.set_defaults(fn=cmd_dsh)
+    p = sub.add_parser("full", help="程序级完整备份（整个 .dsh 打包，同 DSHA 备份）→ auto-backups 子目录")
+    p.add_argument("--reason", default="", help="备份说明")
+    p.add_argument("--auto", action="store_true", help="隔离箱启动自动备份")
+    p.set_defaults(fn=cmd_full)
     p = sub.add_parser("list", help="列出备份")
     p.set_defaults(fn=cmd_list)
     p = sub.add_parser("verify")
