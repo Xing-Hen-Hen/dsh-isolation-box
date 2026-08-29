@@ -159,7 +159,7 @@ def write_folder_readme(root, sub):
     try:
         os.makedirs(root, exist_ok=True)
         desc = {
-            "auto-backups": "隔离箱启动/触发时自动备份（完整备份：会话+配置+插件清单），用于恢复数据",
+            "auto-backups": "隔离箱启动/触发时自动备份（程序级完整备份：整个 .dsh 打包，同 DSHA 工作区备份），程序损坏时用于恢复程序",
             "session-logs": "日志备份（backup.py 显式 / finalize / safe_restart），只含会话（对话）",
         }.get(sub, "DSH 会话备份")
         rows = list_backups(root=root)
@@ -189,7 +189,7 @@ def write_folder_readme(root, sub):
 MANUAL_TEXT = """# 恢复工具使用手册（极简版）
 
 > 工具：`/sdcard/Download/DSHA/%s/tools/backup.py`
-> 备份：`auto-backups/`（完整）、`session-logs/`（会话）
+> 备份：`auto-backups/`（程序级完整 .dsh 打包，恢复程序用）、`session-logs/`（会话）
 
 ## 1. 看有哪些备份
 
