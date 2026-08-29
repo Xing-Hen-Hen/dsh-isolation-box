@@ -83,6 +83,41 @@ def now_ts():
     return time.strftime("%Y%m%d-%H%M%S") + "-%03d" % (time.time_ns() % 1000)
 
 
+def write_folder_readme(root, sub):
+    """在每个备份子文件夹里生成/更新 README.txt：说明文件夹是什么、备份清单与时间。
+
+    每次备份后调用，让用户在手机文件管理器里一眼看懂这个文件夹里有什么。
+    """
+    try:
+        os.makedirs(root, exist_ok=True)
+        desc = {
+            "auto-backups": "隔离箱启动/触发时自动备份（完整备份：会话+配置+插件清单），用于恢复数据",
+            "session-logs": "日志备份（backup.py 显式 / finalize / safe_restart），只含会话（对话）",
+        }.get(sub, "DSH 会话备份")
+        rows = list_backups(root=root)
+        lines = [
+            "本文件夹：%s/" % sub,
+            "内容：%s" % desc,
+            "保存位置：%s" % root,
+            "还原方法：python3 backup.py restore <备份名> --session <会话id>",
+            "",
+            "备份清单（新→旧）：",
+        ]
+        if not rows:
+            lines.append("  （暂无备份）")
+        for b in rows:
+            ts = b["ts"][:15] if len(b["ts"]) >= 15 else b["ts"]
+            lines.append("  - %s（%s，%s 个文件，%s）"
+                         % (b["name"], ts, b["files"], b.get("reason", "无说明") or "无说明"))
+        lines.append("")
+        lines.append("最近备份时间：%s" % (rows[0]["ts"] if rows else "（暂无）"))
+        lines.append("本说明生成/更新时间：%s" % time.strftime("%F %T"))
+        with open(os.path.join(root, "README.txt"), "w") as f:
+            f.write("\n".join(lines) + "\n")
+    except Exception as e:
+        log("[backup] ⚠️ README 生成失败: %s" % e)
+
+
 def log(msg):
     line = "[%s] %s" % (time.strftime("%F %T"), msg)
     print(line, flush=True)
@@ -184,6 +219,7 @@ def cmd_sessions(args):
     with open(os.path.join(dst, "manifest.json"), "w") as f:
         json.dump(man, f, ensure_ascii=False, indent=1)
     keep_prune("sessions", root)
+    write_folder_readme(root, sub)
     log("[backup] ✅ 会话已备份 → %s （%d 个文件）" % (dst, files))
     log("[backup] 还原方法: python3 backup.py restore %s" % name)
     print("BACKUP_DIR=%s" % dst)
@@ -204,6 +240,7 @@ def cmd_dsh(args):
     with open(os.path.join(dst, "manifest.json"), "w") as f:
         json.dump(man, f, ensure_ascii=False, indent=1)
     keep_prune("dsh", root)
+    write_folder_readme(root, sub)
     log("[backup] ✅ DSH 备份完成 → %s （%d 个文件）" % (dst, files))
     print("BACKUP_DIR=%s" % dst)
     return 0
