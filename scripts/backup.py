@@ -25,12 +25,12 @@ import time
 DSH_HOME = os.environ.get("DSH_HOME", "/root/.dsh")
 SESSIONS_SRC = os.path.join(DSH_HOME, "sessions")
 # 备份分两类存放，都默认在 DSHA 下载目录下（必须执行规则，见 SAFETY.md）：
-#   - 自动备份（隔离箱启动/触发时 supervisor 自动做，--auto）→ 「自动备份」子文件夹
-#   - 日志备份（backup.py 显式 / finalize / safe_restart）→ 「会话日志」子文件夹
+#   - 自动备份（隔离箱启动/触发时 supervisor 自动做，--auto）→ 「auto-backups」子文件夹
+#   - 日志备份（backup.py 显式 / finalize / safe_restart）→ 「session-logs」子文件夹
 # DSH_BACKUP_ROOT 环境变量可覆盖父目录
 BACKUP_BASE = os.environ.get("DSH_BACKUP_ROOT", "/sdcard/Download/DSHA")
-AUTO_SUBDIR = "自动备份"
-LOG_SUBDIR = "会话日志"
+AUTO_SUBDIR = "auto-backups"
+LOG_SUBDIR = "session-logs"
 CONFIG_FILES = ["settings.yaml"]
 PROFILE_FILES = ["profiles/web/package.json", "cordis.patch.yml"]
 KEEP = int(os.environ.get("DSH_BACKUP_KEEP", "5"))
@@ -48,13 +48,13 @@ def backup_roots():
 
 
 def ensure_tools():
-    """把恢复工具（backup.py + session_guard.py）复制一份到备份父目录的「工具」子文件夹。
+    """把恢复工具（backup.py + session_guard.py）复制一份到备份父目录的「tools」子文件夹。
 
     目的：程序/插件损坏导致插件内脚本不可用时，仍可从 sdcard 直接运行恢复工具
     （钥匙与数据永远在一起）。幂等：已存在则覆盖更新；运行时自身（工具副本）跳过。
     成功静默（写 backup.log），失败打印警告——不污染 list 等命令的输出。
     """
-    tools_dir = os.path.join(BACKUP_BASE, "工具")
+    tools_dir = os.path.join(BACKUP_BASE, "tools")
     try:
         os.makedirs(tools_dir, exist_ok=True)
         here = os.path.dirname(os.path.abspath(__file__))

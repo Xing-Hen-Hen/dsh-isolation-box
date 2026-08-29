@@ -100,10 +100,10 @@ DSH 自身**没有会话备份能力**（只备份插件/配置清单）。本�
 ```
 
 - **备份目录**（DSHA 下载目录下两个子文件夹，必须执行规则见 SAFETY.md）：
-  - `自动备份/` —— 隔离箱启动/触发时自动备份（reason=`supervisor:*`；**内容 = 完整备份**：会话+配置+插件清单，与 `backup.py dsh` 一致，恢复数据用）
-  - `会话日志/` —— backup.py 显式备份 / finalize / safe_restart
+  - `auto-backups/` —— 隔离箱启动/触发时自动备份（reason=`supervisor:*`；**内容 = 完整备份**：会话+配置+插件清单，与 `backup.py dsh` 一致，恢复数据用）
+  - `session-logs/` —— backup.py 显式备份 / finalize / safe_restart
   - 两类备份**发生时都会明确打印备份目录与还原方法**；每类保留最近 5 份；父目录可用 `DSH_BACKUP_ROOT` 覆盖
-  - `工具/` —— 恢复工具独立副本（backup.py + session_guard.py，每次运行自动同步）：程序/插件损坏时也可直接从 sdcard 运行恢复
+  - `tools/` —— 恢复工具独立副本（backup.py + session_guard.py，每次运行自动同步）：程序/插件损坏时也可直接从 sdcard 运行恢复
 - **还原**：`backup.py restore <备份名> --session <会话id>` 单会话恢复（推荐）；整树还原会回退全部会话，需二次确认；dsh 运行中还原会被拒绝（`--force` 可强）
 - **诚实边界**：自动还原仅在重启走 `safe_restart.py`（或 App/watchdog 正常重启）时生效；**纯手动强杀+强拉没有守卫**，但备份仍在，一条命令手动还原
 
