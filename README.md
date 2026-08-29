@@ -4,7 +4,7 @@
 
 **DSH 插件调试隔离框架** —— 进程隔离 · 看门狗 · 熔断 · 验收 · 启动守卫 · 发布预检
 
-[![version](https://img.shields.io/badge/version-0.1.3-6f83ff?style=flat-square)](https://github.com/Xing-Hen-Hen/dsh-isolation-box/tree/main)
+[![version](https://img.shields.io/badge/version-0.1.3--beta.1-6f83ff?style=flat-square)](https://github.com/Xing-Hen-Hen/dsh-isolation-box/releases)
 [![license](https://img.shields.io/badge/license-MIT-536990?style=flat-square)](LICENSE)
 [![python](https://img.shields.io/badge/python-3.12+-4b6fff?style=flat-square)](https://www.python.org)
 [![node](https://img.shields.io/badge/node-24+-7da1de?style=flat-square)](https://nodejs.org)
@@ -48,13 +48,16 @@ python3 supervisor.py board
 **方式一：npm registry**（推荐，已发布，任何人都可安装）：
 
 ```bash
+# 正式版（v0.1.2，稳定）
 dsh plugin --profile web add dsh-isolation-box
+# 测试版（v0.1.3-beta.1，含会话保险，欢迎试用反馈）
+dsh plugin --profile web add dsh-isolation-box@beta
 ```
 
-**方式二：GitHub 仓库**（公开仓库，零配置）：
+**方式二：GitHub 仓库**（公开仓库，零配置；正式版 tag `v0.1.2`，测试版 tag `v0.1.3-beta.1`）：
 
 ```bash
-dsh plugin --profile web add github:Xing-Hen-Hen/dsh-isolation-box#v0.1.2
+dsh plugin --profile web add github:Xing-Hen-Hen/dsh-isolation-box#v0.1.3-beta.1
 ```
 
 安装后重启 DSH Web Host 生效。插件本体是零依赖挂载点（`lib/index.js`），只打印挂载日志；工具集（`scripts/`）按需运行，**默认 0 进程静默待命**。（DSHA 用户也可在 App「插件」页直接导入发布物。）
