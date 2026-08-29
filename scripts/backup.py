@@ -194,18 +194,23 @@ def cmd_restore(args):
         print("❌ 备份里没有 sessions 目录（%s 不是会话备份）" % args.name)
         return 1
 
+    # 还原目标 = 软链解析后的真实位置（sessions 通常是软链 → /sdcard/...；
+    # 还原到真实位置、保持链接不动，否则 DSH 会找不到会话）
+    real_sessions = os.path.realpath(SESSIONS_SRC)
+    print("⚠️  还原到真实位置: %s" % real_sessions)
+
     # 还原前先备份当前状态（防误还原丢掉新对话）
     pre = os.path.join(CORRUPT_ROOT, "restore-pre-" + now_ts())
-    if os.path.isdir(SESSIONS_SRC):
+    if os.path.isdir(real_sessions):
         os.makedirs(pre)
-        shutil.copytree(SESSIONS_SRC, os.path.join(pre, "sessions"), symlinks=False)
+        shutil.copytree(real_sessions, os.path.join(pre, "sessions"), symlinks=False)
         log("[restore] 还原前已备份当前会话 → %s" % pre)
 
-    # 用备份覆盖当前 sessions
-    if os.path.isdir(SESSIONS_SRC):
-        shutil.rmtree(SESSIONS_SRC, ignore_errors=True)
-    shutil.copytree(src_sessions, SESSIONS_SRC, symlinks=False)
-    files = sum(len(fs) for _, _, fs in os.walk(SESSIONS_SRC))
+    # 用备份覆盖真实位置（删除旧内容；链接本身不动）
+    if os.path.isdir(real_sessions):
+        shutil.rmtree(real_sessions, ignore_errors=True)
+    shutil.copytree(src_sessions, real_sessions, symlinks=False)
+    files = sum(len(fs) for _, _, fs in os.walk(real_sessions))
     log("[restore] ✅ 已还原会话 ← %s （%d 个文件）" % (args.name, files))
     print("⚠️  还原后必须重启 DSH 才生效：python3 safe_restart.py --check 可先校验")
     return 0
