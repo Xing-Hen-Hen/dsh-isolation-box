@@ -26,11 +26,22 @@ import time
 
 DSH_HOME = os.environ.get("DSH_HOME", "/root/.dsh")
 SESSIONS = os.path.join(DSH_HOME, "sessions")
-# 与 backup.py 保持一致：备份在 DSHA 下载目录的「会话日志」文件夹（DSH_BACKUP_ROOT 可覆盖）
-BACKUP_ROOT = os.environ.get(
-    "DSH_BACKUP_ROOT", os.path.join("/sdcard/Download/DSHA", "会话日志"))
+# 与 backup.py 保持一致：备份在 DSHA 下载目录下分「自动备份」/「会话日志」两个子目录
+BACKUP_BASE = os.environ.get("DSH_BACKUP_ROOT", "/sdcard/Download/DSHA")
+AUTO_SUBDIR = "自动备份"
+LOG_SUBDIR = "会话日志"
 PENDING = os.path.join(DSH_HOME, ".restore-pending.json")
 CORRUPT_ROOT = os.environ.get("DSHA_CORRUPT_ROOT", os.path.join(DSH_HOME, "corrupt-backup"))
+
+
+def find_backup_sessions(name):
+    """在两个备份子目录找 <name>/sessions，返回完整路径或 None。"""
+    for base in (os.path.join(BACKUP_BASE, LOG_SUBDIR),
+                 os.path.join(BACKUP_BASE, AUTO_SUBDIR)):
+        p = os.path.join(base, name, "sessions")
+        if os.path.isdir(p):
+            return p
+    return None
 
 
 def log(msg):
@@ -124,8 +135,8 @@ def main():
         return 0
 
     name = pend.get("backup", "")
-    backup_sessions = os.path.join(BACKUP_ROOT, name, "sessions")
-    if not os.path.isdir(backup_sessions):
+    backup_sessions = find_backup_sessions(name)
+    if not backup_sessions:
         log("[guard] ⚠️ 标记指向的备份不存在: %s —— 跳过还原，保留标记供人工处理" % name)
         print("GUARD_SKIP_BACKUP_MISSING")
         return 2

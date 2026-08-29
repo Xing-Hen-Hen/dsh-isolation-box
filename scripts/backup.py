@@ -24,14 +24,27 @@ import time
 
 DSH_HOME = os.environ.get("DSH_HOME", "/root/.dsh")
 SESSIONS_SRC = os.path.join(DSH_HOME, "sessions")
-# 备份默认保存到 DSHA 下载目录的「会话日志」文件夹（必须执行规则，见 SAFETY.md）；
-# 可用 DSH_BACKUP_ROOT 环境变量覆盖
-BACKUP_ROOT = os.environ.get(
-    "DSH_BACKUP_ROOT", os.path.join("/sdcard/Download/DSHA", "会话日志"))
+# 备份分两类存放，都默认在 DSHA 下载目录下（必须执行规则，见 SAFETY.md）：
+#   - 自动备份（隔离箱启动/触发时 supervisor 自动做，--auto）→ 「自动备份」子文件夹
+#   - 日志备份（backup.py 显式 / finalize / safe_restart）→ 「会话日志」子文件夹
+# DSH_BACKUP_ROOT 环境变量可覆盖父目录
+BACKUP_BASE = os.environ.get("DSH_BACKUP_ROOT", "/sdcard/Download/DSHA")
+AUTO_SUBDIR = "自动备份"
+LOG_SUBDIR = "会话日志"
 CONFIG_FILES = ["settings.yaml"]
 PROFILE_FILES = ["profiles/web/package.json", "cordis.patch.yml"]
 KEEP = int(os.environ.get("DSH_BACKUP_KEEP", "5"))
 CORRUPT_ROOT = os.environ.get("DSHA_CORRUPT_ROOT", os.path.join(DSH_HOME, "corrupt-backup"))
+
+
+def backup_root(auto=False):
+    """备份根目录：auto=True → 自动备份；否则 → 会话日志。"""
+    return os.path.join(BACKUP_BASE, AUTO_SUBDIR if auto else LOG_SUBDIR)
+
+
+def backup_roots():
+    """两个备份子目录（list/restore/verify 都要找）。"""
+    return [backup_root(False), backup_root(True)]
 
 
 def now_ts():
@@ -48,43 +61,56 @@ def log(msg):
         pass
 
 
-def list_backups(kind=None):
-    """返回 [{name, kind, ts, size, files}]，按时间倒序。"""
+def list_backups(kind=None, root=None):
+    """返回 [{name, kind, ts, size, files, sub}]，按时间倒序。root 缺省遍历两个子目录。"""
     out = []
-    if not os.path.isdir(BACKUP_ROOT):
-        return out
-    for name in sorted(os.listdir(BACKUP_ROOT), reverse=True):
-        d = os.path.join(BACKUP_ROOT, name)
-        if not os.path.isdir(d):
+    roots = [root] if root else backup_roots()
+    for base in roots:
+        if not os.path.isdir(base):
             continue
-        man = {}
-        try:
-            with open(os.path.join(d, "manifest.json")) as f:
-                man = json.load(f)
-        except Exception:
-            pass
-        k = man.get("kind", name.split("-", 1)[0] if "-" in name else "?")
-        if kind and k != kind:
-            continue
-        size = sum(os.path.getsize(os.path.join(r, fn))
-                   for r, _, fs in os.walk(d) for fn in fs)
-        out.append({
-            "name": name, "kind": k, "ts": man.get("ts", ""),
-            "size": size, "files": man.get("files", 0),
-            "reason": man.get("reason", ""),
-        })
+        sub = os.path.basename(base)
+        for name in sorted(os.listdir(base), reverse=True):
+            d = os.path.join(base, name)
+            if not os.path.isdir(d):
+                continue
+            man = {}
+            try:
+                with open(os.path.join(d, "manifest.json")) as f:
+                    man = json.load(f)
+            except Exception:
+                pass
+            k = man.get("kind", name.split("-", 1)[0] if "-" in name else "?")
+            if kind and k != kind:
+                continue
+            size = sum(os.path.getsize(os.path.join(r, fn))
+                       for r, _, fs in os.walk(d) for fn in fs)
+            out.append({
+                "name": name, "kind": k, "ts": man.get("ts", ""),
+                "size": size, "files": man.get("files", 0),
+                "reason": man.get("reason", ""), "sub": sub,
+            })
+    out.sort(key=lambda b: b["ts"], reverse=True)
     return out
 
 
-def keep_prune(kind):
-    """同一类型只保留最近 KEEP 份。"""
+def find_backup(name):
+    """在两个子目录里找备份，返回 (目录, 完整路径) 或 (None, None)。"""
+    for base in backup_roots():
+        d = os.path.join(base, name)
+        if os.path.isdir(d):
+            return base, d
+    return None, None
+
+
+def keep_prune(kind, root):
+    """同一子目录内同一类型只保留最近 KEEP 份。"""
     keep, removed = KEEP, 0
-    for b in list_backups(kind):
+    for b in list_backups(kind, root):
         if keep > 0:
             keep -= 1
             continue
         try:
-            shutil.rmtree(os.path.join(BACKUP_ROOT, b["name"]), ignore_errors=True)
+            shutil.rmtree(os.path.join(root, b["name"]), ignore_errors=True)
             removed += 1
         except Exception:
             pass
@@ -115,15 +141,17 @@ def copy_cfg(dst):
 
 def cmd_sessions(args):
     name = "sessions-" + now_ts()
-    dst = os.path.join(BACKUP_ROOT, name)
+    root = backup_root(getattr(args, "auto", False))
+    sub = AUTO_SUBDIR if getattr(args, "auto", False) else LOG_SUBDIR
+    dst = os.path.join(root, name)
     os.makedirs(dst)
     files = copy_sessions(os.path.join(dst, "sessions"))
     man = {"kind": "sessions", "name": name, "ts": now_ts(),
-           "files": files, "reason": args.reason or "",
+           "files": files, "reason": args.reason or "", "sub": sub,
            "restore": "python3 backup.py restore %s" % name}
     with open(os.path.join(dst, "manifest.json"), "w") as f:
         json.dump(man, f, ensure_ascii=False, indent=1)
-    keep_prune("sessions")
+    keep_prune("sessions", root)
     log("[backup] ✅ 会话已备份 → %s （%d 个文件）" % (dst, files))
     log("[backup] 还原方法: python3 backup.py restore %s" % name)
     print("BACKUP_DIR=%s" % dst)
@@ -132,16 +160,18 @@ def cmd_sessions(args):
 
 def cmd_dsh(args):
     name = "dsh-" + now_ts()
-    dst = os.path.join(BACKUP_ROOT, name)
+    root = backup_root(getattr(args, "auto", False))
+    sub = AUTO_SUBDIR if getattr(args, "auto", False) else LOG_SUBDIR
+    dst = os.path.join(root, name)
     os.makedirs(dst)
     files = copy_sessions(os.path.join(dst, "sessions"))
     files += copy_cfg(dst)
     man = {"kind": "dsh", "name": name, "ts": now_ts(), "files": files,
-           "reason": args.reason or "",
+           "reason": args.reason or "", "sub": sub,
            "restore": "python3 backup.py restore %s" % name}
     with open(os.path.join(dst, "manifest.json"), "w") as f:
         json.dump(man, f, ensure_ascii=False, indent=1)
-    keep_prune("dsh")
+    keep_prune("dsh", root)
     log("[backup] ✅ DSH 备份完成 → %s （%d 个文件）" % (dst, files))
     print("BACKUP_DIR=%s" % dst)
     return 0
@@ -152,17 +182,18 @@ def cmd_list(args):
     if not rows:
         print("(无备份。backup.py sessions 创建第一份)")
         return 0
-    print("%-22s %-9s %-17s %8s  %s" % ("名称", "类型", "时间", "大小", "说明"))
+    print("%-9s %-22s %-9s %-17s %8s  %s" % ("位置", "名称", "类型", "时间", "大小", "说明"))
     for b in rows:
-        print("%-22s %-9s %-17s %7.1fK  %s"
-              % (b["name"], b["kind"], b["ts"], b["size"] / 1024.0, b.get("reason", "")))
+        print("%-9s %-22s %-9s %-17s %7.1fK  %s"
+              % (b.get("sub", "?"), b["name"], b["kind"], b["ts"],
+                 b["size"] / 1024.0, b.get("reason", "")))
     return 0
 
 
 def cmd_verify(args):
-    d = os.path.join(BACKUP_ROOT, args.name)
-    if not os.path.isdir(d):
-        print("❌ 备份不存在: %s" % args.name)
+    base, d = find_backup(args.name)
+    if not d:
+        print("❌ 备份不存在: %s（自动备份/会话日志 两处均已查找）" % args.name)
         return 1
     man = {}
     try:
@@ -208,10 +239,10 @@ def find_session_in_backup(src_sessions, session_id):
 
 
 def cmd_restore(args):
-    d = os.path.join(BACKUP_ROOT, args.name)
+    base, d = find_backup(args.name)
     print("⚠️  还原目标目录: %s/sessions （确认 DSH_HOME 指向正确！）" % DSH_HOME)
-    if not os.path.isdir(d):
-        print("❌ 备份不存在: %s" % args.name)
+    if not d:
+        print("❌ 备份不存在: %s（自动备份/会话日志 两处均已查找）" % args.name)
         return 1
     man = {}
     try:
@@ -286,11 +317,13 @@ def main():
     import argparse
     ap = argparse.ArgumentParser(description="DSH 会话/配置备份工具（隔离箱保险）")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("sessions", help="只备份会话（对话）")
+    p = sub.add_parser("sessions", help="只备份会话（对话）→ 会话日志 子目录")
     p.add_argument("--reason", default="", help="备份说明")
+    p.add_argument("--auto", action="store_true", help="隔离箱启动自动备份 → 自动备份 子目录")
     p.set_defaults(fn=cmd_sessions)
-    p = sub.add_parser("dsh", help="完整备份（会话+配置+插件清单）")
+    p = sub.add_parser("dsh", help="完整备份（会话+配置+插件清单）→ 会话日志 子目录")
     p.add_argument("--reason", default="", help="备份说明")
+    p.add_argument("--auto", action="store_true", help="隔离箱启动自动备份 → 自动备份 子目录")
     p.set_defaults(fn=cmd_dsh)
     p = sub.add_parser("list", help="列出备份")
     p.set_defaults(fn=cmd_list)

@@ -380,10 +380,11 @@ th{color:#aaa;border:1px solid #333;padding:6px}td{border:1px solid #333;padding
 
 # ---------------------------------------------------------------- 保险（v0.1.3）
 def auto_backup(reason="supervisor"):
-    """启动时默认自动备份会话（--no-backup 可关）。明确打印备份目录与还原方法。"""
+    """启动时默认自动备份会话（--no-backup 可关），存入「自动备份」子目录。
+    明确打印备份目录与还原方法（必须告知用户）。"""
     try:
         r = subprocess.run([sys.executable, os.path.join(BASE, "backup.py"),
-                            "sessions", "--reason", reason],
+                            "sessions", "--reason", reason, "--auto"],
                            capture_output=True, text=True, timeout=120)
         for line in (r.stdout or "").splitlines():
             if line.startswith("[backup]") or line.startswith("BACKUP_DIR="):
