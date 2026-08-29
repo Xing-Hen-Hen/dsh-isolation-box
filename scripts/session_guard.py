@@ -26,7 +26,9 @@ import time
 
 DSH_HOME = os.environ.get("DSH_HOME", "/root/.dsh")
 SESSIONS = os.path.join(DSH_HOME, "sessions")
-BACKUP_ROOT = os.path.join(DSH_HOME, "backups")
+# 与 backup.py 保持一致：备份在 DSHA 下载目录的「会话日志」文件夹（DSH_BACKUP_ROOT 可覆盖）
+BACKUP_ROOT = os.environ.get(
+    "DSH_BACKUP_ROOT", os.path.join("/sdcard/Download/DSHA", "会话日志"))
 PENDING = os.path.join(DSH_HOME, ".restore-pending.json")
 CORRUPT_ROOT = os.environ.get("DSHA_CORRUPT_ROOT", os.path.join(DSH_HOME, "corrupt-backup"))
 

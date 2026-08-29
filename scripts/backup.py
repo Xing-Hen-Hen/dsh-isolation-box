@@ -24,7 +24,10 @@ import time
 
 DSH_HOME = os.environ.get("DSH_HOME", "/root/.dsh")
 SESSIONS_SRC = os.path.join(DSH_HOME, "sessions")
-BACKUP_ROOT = os.path.join(DSH_HOME, "backups")
+# 备份默认保存到 DSHA 下载目录的「会话日志」文件夹（必须执行规则，见 SAFETY.md）；
+# 可用 DSH_BACKUP_ROOT 环境变量覆盖
+BACKUP_ROOT = os.environ.get(
+    "DSH_BACKUP_ROOT", os.path.join("/sdcard/Download/DSHA", "会话日志"))
 CONFIG_FILES = ["settings.yaml"]
 PROFILE_FILES = ["profiles/web/package.json", "cordis.patch.yml"]
 KEEP = int(os.environ.get("DSH_BACKUP_KEEP", "5"))
