@@ -174,6 +174,7 @@ def cmd_verify(args):
 
 def cmd_restore(args):
     d = os.path.join(BACKUP_ROOT, args.name)
+    print("⚠️  还原目标目录: %s/sessions （确认 DSH_HOME 指向正确！）" % DSH_HOME)
     if not os.path.isdir(d):
         print("❌ 备份不存在: %s" % args.name)
         return 1

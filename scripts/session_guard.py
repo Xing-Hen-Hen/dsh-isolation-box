@@ -112,6 +112,7 @@ def do_restore(name, backup_sessions):
 
 def main():
     check_only = "--check" in sys.argv
+    print("[guard] 操作目标: %s （确认 DSH_HOME 指向正确！）" % DSH_HOME, flush=True)
     pend = read_pending()
     if not pend:
         if check_only:
