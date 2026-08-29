@@ -22,6 +22,7 @@
     "docs",
     "README.md",
     "SAFETY.md",
+    "LICENSE",
     "cordis.patch.yml"
   ]
 }

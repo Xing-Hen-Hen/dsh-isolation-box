@@ -1,125 +1,131 @@
-# DSH 多实例插件框架 · 使用手册
+<div align="center">
 
-> 零第三方依赖 · 全部标准库 · 已在 Ubuntu 24.04 (aarch64) / Python 3.12+ / Node 24+ 验证
-> 设计文档：`docs/multi-instance-plugin-design.md`
+# dsh-isolation-box
 
-## 一、组成
+**DSH 插件调试隔离框架** —— 进程隔离 · 看门狗 · 熔断 · 验收 · 启动守卫 · 发布预检
 
-| 文件 | 角色 |
+[![version](https://img.shields.io/badge/version-0.1.2-6f83ff?style=flat-square)](https://github.com/Xing-Hen-Hen/dsh-isolation-box/tree/main)
+[![license](https://img.shields.io/badge/license-MIT-536990?style=flat-square)](LICENSE)
+[![python](https://img.shields.io/badge/python-3.12+-4b6fff?style=flat-square)](https://www.python.org)
+[![node](https://img.shields.io/badge/node-24+-7da1de?style=flat-square)](https://nodejs.org)
+[![deps](https://img.shields.io/badge/deps-zero%20third--party-brightgreen?style=flat-square)](package.json)
+
+</div>
+
+> 在无法使用内核沙箱的受限容器环境中，用「进程边界」接住调试的崩溃，用「五道预检」拦住生产的错误，用「熔断与回滚」兜住所有的意外——**宿主永远先活着，插件永远轻装出发。**
+
+本框架专为 [DSHA](https://github.com/qiannianhuanxiang/DSHA)（DeepSeek Harness App）适配设计。调试 DSH 插件时，最怕三件事：插件崩溃拖垮宿主、坏代码污染正式区、测试通过但安装后崩。本框架用**纯进程级隔离**（无需 namespace/root）解决这三件事：零第三方依赖，全部 Python 标准库。
+
+## ✨ 特性
+
+| 能力 | 说明 |
 |---|---|
-| `supervisor.py` | 宿主：spawn / 心跳看门狗 / 进程组强杀 / 退避重启 / 熔断 / 取证 / 浏览器看板 |
-| `instance_runner.py` | 实例骨架：心跳上报 / 状态机 / 插件契约执行 / `--smoke` 冒烟模式 |
-| `dsh_guard.py` | 启动守卫：备份 / 启动失败自动回滚 / 安全模式兜底 |
-| `plugin_demo.py` | 演示插件（含契约范例：init/run） |
-| `bad_plugin.py` | 坏插件（演示验收拦截） |
-| `dsh_sim.py` | 模拟 DSH 启动器（演示守卫，不碰真实 DSH） |
-| `demo_story.py` | 四幕自动化演示（崩溃自愈/熔断/验收拦截/启动守卫） |
+| 🧱 **进程级隔离** | 实例是独立进程（rlimit 硬限内存/CPU/core），崩溃信号天然不跨进程——宿主永不随插件崩 |
+| ⏱️ **看门狗 + 熔断** | 2s 心跳、5s 超时进程组强杀；连崩 3 次自动熔断止损，等人工处理 |
+| ✅ **验收闸 ①** | 实例冒烟测试（加载 + 初始化），通过才允许替换正式插件目录 |
+| 🛡️ **启动守卫 ②③** | 启动失败自动回滚备份 → 仍失败进入安全模式（跳过全部插件），DSH 必起 |
+| 📦 **发布五道预检** | 顶层名=包名 / 依赖闭包实体 / bundle 声明 / 客户端指纹 / 动态 boot 预演，全绿才可发布 |
+| 📊 **浏览器看板** | 只读状态看板（`127.0.0.1:8765`），3s 自动刷新，崩溃行标红 |
+| 🖥️ **完整实例层** | 拉起与主实例完全同构的独立 DSH（独立 profile/端口/进程/GUI），插件隔离测试 |
+| 🔍 **崩溃取证** | stderr 尾 200 行 + 退出码 + 状态文件自动落盘，现场可回放 |
 
-## 二、插件契约（写插件照这个来）
+## 🚀 快速开始
+
+```bash
+# 1. 验收一个插件：实例冒烟通过才允许进正式目录（退出码 0=通过）
+python3 supervisor.py approve ./your_plugin.py
+
+# 2. 监督它：崩溃自动退避重启，连崩 3 次熔断
+python3 supervisor.py supervise --specs demo1=./your_plugin.py
+
+# 3. 围观：浏览器看板（3s 自动刷新，崩溃行变红）
+python3 supervisor.py board
+```
+
+## 📦 安装为 DSH 插件
+
+**正式安装**（一条命令，固定版本，可复现、可回滚）：
+
+```bash
+dsh plugin --profile web add github:Xing-Hen-Hen/dsh-isolation-box#v0.1.2
+```
+
+`main` 分支为开发分支，发布物不稳定，不提供安装命令；如需最新开发版或自行修改，可 clone 仓库后本地使用。
+
+安装后重启 DSH Web Host 生效。插件本体是零依赖挂载点（`lib/index.js`），只打印挂载日志；工具集（`scripts/`）按需运行，**默认 0 进程静默待命**。（DSHA 用户也可在 App「插件」页直接导入发布物。）
+
+## 🛠️ 命令速查
+
+| 命令 | 作用 |
+|---|---|
+| `supervisor.py supervise --specs <id>=<plugin.py>` | 监督实例（退避重启 / 熔断 / 取证） |
+| `supervisor.py approve <plugin.py>` | 闸① 验收：冒烟通过才允许替换 |
+| `supervisor.py status` / `logs <id>` | 实例状态表 / 崩溃日志尾部 200 行 |
+| `supervisor.py kill <id>` / `disable <id>` | 强杀进程组 / 人工禁用 |
+| `supervisor.py board [--open]` | 浏览器看板（`127.0.0.1:8765`） |
+| `dsh_guard.py backup` | 闸① 通过后、替换前备份正式目录 |
+| `dsh_guard.py start --cmd "dsh web" --timeout 60` | 闸②③ 带回滚/安全模式的启动 |
+| `dsh_tool.py up <name> [--port]` | 拉起完整 DSH 实例（同构主 profile） |
+| `dsh_tool.py down <name>` / `status` | 停止实例 / 列出实例 |
+| `dsh_tool.py publish --src <dir> --name <pkg> --version <v> [--fingerprint <f>]` | 发布唯一入口：五道预检全绿才产出可导入包 |
+
+## 📖 插件契约（开发者）
+
+**契约 = 隔离箱与待测插件之间的接口约定**：隔离箱负责把插件加载进独立进程、注入上下文 `ctx`、跑心跳/冒烟/取证；插件只需按约定实现下面两个**可选**函数，即可被隔离箱驱动：
 
 ```python
-def init(ctx): ...          # 可选：初始化（冒烟测试会执行到这里）
-def run(ctx) -> dict: ...   # 可选：主逻辑，返回结果字典
-# ctx:  ctx.work_dir 实例工作区; ctx.task 宿主注入的任务; ctx.report(status, detail); ctx.log(msg)
+def init(ctx) -> None      # 可选：初始化（冒烟测试会执行到这里）
+def run(ctx) -> dict       # 可选：主逻辑，返回结果字典
+# ctx.work_dir 实例工作区; ctx.task 宿主注入的任务
+# ctx.report(status, detail); ctx.log(msg)
 ```
 
-## 三、命令速查
+- 两个函数都可不实现（隔离箱仍能监督实例、看心跳）
+- `init` 抛异常 = 冒烟失败 = 验收闸① 拦截，禁止进正式目录
+- `run` 的返回值会落盘到 `result.json` 供宿主读取
 
-```bash
-# 监督一个/多个实例（崩了自动退避重启，连崩 3 次熔断）
-python3 supervisor.py supervise --specs demo1=plugin_demo.py
+## 🔍 工作原理
 
-# 闸① 验收：实例环境冒烟测试，通过才允许替换正式插件目录
-python3 supervisor.py approve <待验收插件.py>        # 退出码 0=通过
+崩溃本质是**进程属性**而非环境属性：不需要 namespace，只要实例是独立进程，信号传播天然不跨进程。配套三类实测可用的原语：
 
-# 浏览器看板（移动端浏览器 http://127.0.0.1:8765/，可悬浮小窗）
-python3 supervisor.py board
+- **rlimit 硬上限** —— 内存泄漏 / 死循环 / fork 炸弹被约束在实例内
+- **心跳 + 看门狗** —— 挂死由宿主定时器进程组 SIGKILL 回收
+- **指数退避重启 + 熔断** —— 崩了自动试，连崩 3 次止损等人工
 
-# 查看状态 / 崩溃日志 / 强杀 / 人工禁用
-python3 supervisor.py status
-python3 supervisor.py logs <id>
-python3 supervisor.py kill <id>
-python3 supervisor.py disable <id>
+环境等价性（`scripts/equiv_probe.py` 实测）：实例与宿主共享同一运行时 / 依赖面 / 工具链，试跑结果可信。
 
-# 启动守卫：闸② 备份 + 闸③ 回滚/安全模式
-python3 dsh_guard.py backup                          # 通过验收后、替换前先备份
-python3 dsh_guard.py start --cmd "dsh web" --timeout 60   # 真实 DSH 接入时用
-```
+## 📁 文档
 
-## 四、真实 DSH 接入（待做）
-
-`dsh_guard start --cmd` 的**就绪判定**目前以 READY 文件模拟；接入真实 `dsh web` 时：
-1. 把就绪判定换成实际信号（Web GUI 端口探测 / 启动日志关键字），在 `dsh_guard.py` 的 `wait_ready()` 中适配；
-2. `--cmd "dsh web"` 即为真实启动命令，回滚/安全模式逻辑不变（安全模式注入 `DSH_PLUGIN_SAFE=1`，需 DSH 侧识别该变量时跳过用户插件加载——留待 DSH 插件加载器集成时实现）。
-
-## 五、默认参数（已确认）
-
-内存 512MB/实例 · CPU 60s · 心跳 2s · 看门狗 5s · 退避 0.5/1/2/4s · 连崩 3 次熔断 · 看板 127.0.0.1:8765 · 3s 自动刷新
-
-## 七、完整 DSH 实例（dsh-tool，效果层测试）
-
-「两者结合」的第二层：每个测试实例 = **完整 DSH（独立 profile + 独立端口 + 独立进程 + 完整 GUI）**，浏览器直达，界面与主实例完全一致（含移动导航/客户端插件），插件/会话可隔离测试。
-
-```bash
-python3 dsh_tool.py up <name> --port 3082     # 拉起完整实例（自动同构主 profile，含用户插件栈）
-python3 dsh_tool.py down <name>               # 停止实例
-python3 dsh_tool.py status                    # 列出实例（端口/PID/访问URL）
-```
-
-访问 URL 已自动附鉴权通行证（对 web 服务的 token 鉴权，浏览器直达既安全又免配置）。
-
-**已验证**：test-live(3081)/test-2(3082) 并行运行，HTML + `/plugins/` 客户端插件均 200，界面与主实例一致。
-
-**踩坑记录**（已解决）：
-- 裁剪版 profile 会缺 `dsh-client-*` 客户端插件路由（/plugins/ 404）与移动导航——必须与主 profile 完全同构（复制 package.json + 以正式名软链 `.ignored_*` 隐藏用户插件）
-- web 响应必须带防缓存头（用户端会缓存旧快照，出现「幽灵实例」）
-
-## 七·五、插件适配案例：dsh-reasoning-effort v0.6.2（已完成 ✔）
-
-流程：源码进隔离箱 → 尝试源码构建 → 官方产物部署 → 测试实例验证 → **主实例零接触**。
-
-| 环节 | 结果 |
+| 文档 | 内容 |
 |---|---|
-| 源码管理 | 进隔离箱 git（`plugins-under-test/dsh-reasoning-effort/`，可回滚） |
-| 源码构建 | ⚠️ 环境不可复现：`@deepseek-ai/cordis@4.0.1` 类型缺 `Context` 导出 + pnpm store `.ts` 分片解析失败（上游在含 workspace 内部 cordis 的环境构建） |
-| 部署物 | 官方 0.6.2 发布产物（与源 md5 `0da2e38...` 一致，无污染） |
-| 实例验证 | test-live 插件 client.js 200（1.77MB）、页面注入、用户确认 UI 正常 ✅ |
-| 主实例 | 0 处插件痕迹，完全隔离 ✅ |
+| [SAFETY.md](SAFETY.md) | 调试安全纪律：触发纪律 / 绝对不动清单 / 三档恢复 |
+| [docs/PRINCIPLE.md](docs/PRINCIPLE.md) | 原理说明：为什么进程级隔离成立、诚实边界 |
+| [docs/multi-instance-plugin-design.md](docs/multi-instance-plugin-design.md) | 完整设计文档：环境体检、架构、防御矩阵、生命周期 |
 
-**使用**：`dsh_tool.py up test-live --port 3081` → 浏览器打开即见插件；主实例想装时按官方 README 走 `dsh plugin --profile web add ...`（需用户确认 + 手动重启主 DSH）。
-
-## 七·八、触发纪律与发布管道（2026-08-27 定稿）
-
-**触发纪律**（SAFETY.md 第 0 节）：
-- 改插件/调整程序/修代码 → 触发隔离箱（试跑/验证/发布预检）
-- 其他日常 → **不触发**（零进程静默，看板待命不弹窗）
-- 用户明说「用隔离箱」→ 按需触发
-
-**发布管道（唯一入口）**：
-```bash
-python3 dsh_tool.py publish --src <插件源码目录> --name <包名> --version <版本> \
-       --fingerprint "<客户端产物指纹>"
-# 内部强制五道预检：①顶层名=包名 ②依赖闭包实体 ③bundle声明 ④产物指纹 ⑤动态boot预演（App解压语义模拟）
-# 五道全绿 → 产出 tar.gz 可导入；任何一道不过 → 禁发
-```
-
-**浏览器行为**：
-- 看板（board）：**默认不弹浏览器**（`--open` 显式开启）；静默待命
-- 完整实例（`dsh_tool up`）：**就绪自动弹出浏览器**（`--no-open` 可关）
-
-## 八、演示结果（今日实测）
-
-四幕全部通过：
-1. 崩溃自愈：坏插件连崩 2 次 → 第 3 次自动成功（实例重启 2 次，宿主零影响）
-2. 熔断：永远坏的插件连崩 3 次 → 熔断停在「需人工」
-3. 验收拦截：坏插件冒烟失败禁止替换；好插件放行
-4. 启动守卫：启动失败 → 自动回滚重试成功；回滚也失败 → 安全模式必起
-
-期间还抓到并修复了 2 个真实 bug（线程写竞态、CSS 花括号格式化），充分说明「崩溃现场取证 → 修复 → 重跑」链路好用。
-
-## 九、环境要求
+## ⚙️ 环境要求
 
 - **操作系统**：Linux（aarch64 / x86_64），已在 Ubuntu 24.04 aarch64 验证
 - **Python**：3.12+（标准库，零第三方依赖）
 - **Node.js**：24+（`dsh_tool.py` 完整 DSH 实例层使用）
-- **可选**：DSH 桥接通道（`/app/*`）用于自动打开浏览器/看板；缺失时工具自动降级为打印访问地址，功能不受影响
+- **DSHA 环境**：提供 DSH 桥接通道（`/app/*`），用于自动打开浏览器/看板；缺失时自动降级为打印访问地址
+
+路径均可用环境变量覆盖（`DSH_HOME` / `DSH_INSTANCES_ROOT` / `DSH_EXPORT_DIR` 等），解压到任意目录即可运行。
+
+## 🧪 演示与验证
+
+`scripts/demo_story.py` 四幕全链路自动化验证：
+
+1. **崩溃自愈**：坏插件连崩 2 次 → 第 3 次自动成功（宿主零影响）
+2. **熔断**：永远坏的插件连崩 3 次 → 熔断停在「需人工」
+3. **验收拦截**：坏插件冒烟失败禁止替换；好插件放行
+4. **启动守卫**：启动失败 → 自动回滚重试成功；回滚也失败 → 安全模式必起
+
+## ⚠️ 诚实边界
+
+- **防 bug，不防恶意**：**可以测试陌生人代码**——实例是独立进程，其崩溃/死循环不会拖垮宿主；但实例与宿主同 uid、无权限隔离，恶意代码理论上可越界读写全盘，测不可信代码时请自行评估风险
+- **无网络隔离 / 文件系统不虚拟化**：依赖「约定 + 独立状态目录」，不是硬墙
+- 详细边界见 [docs/PRINCIPLE.md](docs/PRINCIPLE.md) 第六节
+
+## 📄 许可证
+
+[MIT](LICENSE)
