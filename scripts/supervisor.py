@@ -378,9 +378,96 @@ th{color:#aaa;border:1px solid #333;padding:6px}td{border:1px solid #333;padding
     HTTPServer(("127.0.0.1", 8765), H).serve_forever()
 
 
+# ---------------------------------------------------------------- 保险（v0.1.3）
+def auto_backup(reason="supervisor"):
+    """启动时默认自动备份会话（--no-backup 可关）。明确打印备份目录与还原方法。"""
+    try:
+        r = subprocess.run([sys.executable, os.path.join(BASE, "backup.py"),
+                            "sessions", "--reason", reason],
+                           capture_output=True, text=True, timeout=120)
+        for line in (r.stdout or "").splitlines():
+            if line.startswith("[backup]") or line.startswith("BACKUP_DIR="):
+                print(line, flush=True)
+    except Exception as e:
+        print(f"[supervisor] ⚠️ 自动备份失败（继续运行）: {e}")
+
+
+def cmd_stop_all(args):
+    """停止全部实例进程 + 看板服务。校验 instance_runner 零残留。"""
+    import signal as _sig
+    stopped = []
+    if os.path.isdir(INSTANCES_ROOT):
+        for name in sorted(os.listdir(INSTANCES_ROOT)):
+            meta = read_json(os.path.join(inst_dir(name), "meta.json"), {})
+            pid = meta.get("pid")
+            if pid:
+                try:
+                    os.killpg(pid, _sig.SIGKILL)
+                    stopped.append(f"{name}(pid={pid})")
+                except Exception:
+                    pass
+    # 看板服务（8765）
+    out = subprocess.run(["pgrep", "-f", "supervisor[.]py board"],
+                         capture_output=True, text=True).stdout.strip()
+    for p in out.splitlines():
+        if p.isdigit():
+            try:
+                os.killpg(int(p), _sig.SIGKILL)
+                stopped.append(f"board(pid={p})")
+            except Exception:
+                pass
+    # 校验实例骨架零残留
+    left = subprocess.run(["pgrep", "-f", "instance_runner[.]py"],
+                          capture_output=True, text=True).stdout.strip()
+    left = [p for p in left.splitlines() if p.isdigit()]
+    print(f"[supervisor] stop-all: 已停止 {len(stopped)} 个进程组: {', '.join(stopped) or '无'}")
+    if left:
+        print(f"[supervisor] ⚠️ 仍有实例进程残留: {','.join(left)}（请人工确认）")
+    else:
+        print("[supervisor] ✅ 实例/看板进程已全部停止（instance_runner 零残留）")
+    return 0
+
+
+def cmd_finalize(args):
+    """最后一步：强制备份会话（含当前对话）→ 停全部进程 → 询问是否安装进主进程。
+
+    安装动作由宿主（Agent/用户）用 dsh plugin add 完成；本命令保证「询问前
+    所有对话已备份、所有实例进程已停止」，确认后引导安全重启（safe_restart）。
+    """
+    print("═══ 最后一步：安装到主 DSH ═══")
+    # ① 强制备份（含当前对话）
+    print("→ ① 备份所有会话（含当前对话）…")
+    auto_backup(reason="finalize")
+    # ② 停止全部实例/看板
+    print("→ ② 停止全部实例进程与看板…")
+    cmd_stop_all(args)
+    # ③ 指引
+    print("→ ③ 安装指引（确认后由你/宿主执行）:")
+    if getattr(args, "plugin", None):
+        print(f"     dsh plugin --profile web add file:{os.path.abspath(args.plugin)}")
+    else:
+        print("     dsh plugin --profile web add <包名或路径>")
+    print("→ ④ 还原方法（出事时）:")
+    print("     python3 backup.py restore <备份名>   # backup.py list 查看")
+    print("     python3 safe_restart.py --check      # 重启后校验")
+    # ④ 询问
+    ans = input("⚠️ 确认把插件写入主进程并安全重启？[y/N] ").strip().lower()
+    if ans not in ("y", "yes"):
+        print("[supervisor] 已取消（备份与进程停止已生效，环境处于安全态）")
+        return 1
+    # ⑤ 安全重启
+    print("→ ⑤ 执行安全重启（safe_restart）…")
+    r = subprocess.run([sys.executable, os.path.join(BASE, "safe_restart.py"), "--yes"],
+                       text=True)
+    print("[supervisor] finalize 完成，返回码 %d" % r.returncode)
+    return r.returncode
+
+
 # ---------------------------------------------------------------- main
 def main():
     ap = argparse.ArgumentParser(description="DSH 多实例宿主 supervisor")
+    ap.add_argument("--no-backup", action="store_true",
+                    help="关闭启动时的会话自动备份")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("supervise")
     p.add_argument("--specs", action="append", required=True, help="id=plugin_path，可重复")
@@ -403,7 +490,15 @@ def main():
     p = sub.add_parser("disable")
     p.add_argument("id")
     p.set_defaults(fn=cmd_disable)
+    p = sub.add_parser("stop-all")
+    p.set_defaults(fn=cmd_stop_all)
+    p = sub.add_parser("finalize")
+    p.add_argument("--plugin", default="", help="待安装插件路径（仅指引用）")
+    p.set_defaults(fn=cmd_finalize)
     args = ap.parse_args()
+    # 启动自动备份（除 finalize 自身已强制备份、stop-all/status 等轻量命令外默认开启）
+    if not args.no_backup and args.cmd not in ("finalize", "stop-all", "status", "logs", "list"):
+        auto_backup(reason="supervisor:" + args.cmd)
     sys.exit(args.fn(args) or 0)
 
 

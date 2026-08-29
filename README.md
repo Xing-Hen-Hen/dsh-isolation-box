@@ -4,7 +4,7 @@
 
 **DSH 插件调试隔离框架** —— 进程隔离 · 看门狗 · 熔断 · 验收 · 启动守卫 · 发布预检
 
-[![version](https://img.shields.io/badge/version-0.1.2-6f83ff?style=flat-square)](https://github.com/Xing-Hen-Hen/dsh-isolation-box/tree/main)
+[![version](https://img.shields.io/badge/version-0.1.3-6f83ff?style=flat-square)](https://github.com/Xing-Hen-Hen/dsh-isolation-box/tree/main)
 [![license](https://img.shields.io/badge/license-MIT-536990?style=flat-square)](LICENSE)
 [![python](https://img.shields.io/badge/python-3.12+-4b6fff?style=flat-square)](https://www.python.org)
 [![node](https://img.shields.io/badge/node-24+-7da1de?style=flat-square)](https://nodejs.org)
@@ -28,6 +28,7 @@
 | 📊 **浏览器看板** | 只读状态看板（`127.0.0.1:8765`），3s 自动刷新，崩溃行标红 |
 | 🖥️ **完整实例层** | 拉起与主实例完全同构的独立 DSH（独立 profile/端口/进程/GUI），插件隔离测试 |
 | 🔍 **崩溃取证** | stderr 尾 200 行 + 退出码 + 状态文件自动落盘，现场可回放 |
+| 💾 **会话保险** | 启动自动备份；最后一步强制备份+停进程；安全重启防 #420；独立守卫自动还原 |
 
 ## 🚀 快速开始
 
@@ -74,6 +75,30 @@ dsh plugin --profile web add github:Xing-Hen-Hen/dsh-isolation-box#v0.1.2
 | `dsh_tool.py up <name> [--port]` | 拉起完整 DSH 实例（同构主 profile） |
 | `dsh_tool.py down <name>` / `status` | 停止实例 / 列出实例 |
 | `dsh_tool.py publish --src <dir> --name <pkg> --version <v> [--fingerprint <f>]` | 发布唯一入口：五道预检全绿才产出可导入包 |
+| `supervisor.py finalize --plugin <path>` | **最后一步**：强制备份会话 → 停全部实例/看板 → 询问是否安装进主进程 |
+| `supervisor.py stop-all` | 停止全部实例进程 + 看板（校验 instance_runner 零残留） |
+| `backup.py sessions [--reason <说明>]` | 备份会话（对话）→ 打印备份目录与还原方法 |
+| `backup.py dsh` / `list` / `restore <名>` / `verify <名>` | 完整备份 / 列出备份 / 还原 / 校验 |
+| `safe_restart.py [--dry-run]` | 安全重启主 DSH：备份→优雅停止→等端口释放→守卫检查→拉起（防 #420 会话损坏） |
+| `session_guard.py` | 独立还原守卫：DSH 启动前检测会话损坏 → 自动从备份还原（不依赖 Agent） |
+
+## 💾 会话保险（最后一步）
+
+DSH 自身**没有会话备份能力**（只备份插件/配置清单）。本框架补上「存档 + 守卫」两层，防止装完插件重启时会话损坏（官方 #420：双进程写同一会话 → seq 重复）：
+
+```
+① 启动时        supervisor 每次调用默认自动备份会话（--no-backup 关闭）
+② 最后一步      supervisor.py finalize：强制备份（含当前对话）→ 停全部实例/看板
+                 → 打印备份目录与还原方法 → 询问「确认安装进主进程？」→ 确认后 safe_restart
+③ 安全重启      safe_restart.py：备份 → SIGTERM 优雅停止 → 等端口彻底释放（#420 解药）
+                 → session_guard 检查 → 拉起 → 等就绪
+④ 自动还原      session_guard.py（独立守卫，不依赖 Agent）：启动前检测会话与备份不一致
+                 → 自动从备份还原 + 损坏文件留证
+```
+
+- **备份目录**：`$DSH_HOME/backups/<类型>-<时间戳>/`（每类保留最近 5 份）
+- **还原**：`backup.py restore <备份名>`（还原前自动备份当前状态；还原后需重启 DSH）
+- **诚实边界**：自动还原仅在重启走 `safe_restart.py`（或 App/watchdog 正常重启）时生效；**纯手动强杀+强拉没有守卫**，但备份仍在，一条命令手动还原
 
 ## 📖 插件契约（开发者）
 
