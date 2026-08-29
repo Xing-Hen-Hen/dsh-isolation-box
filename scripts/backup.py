@@ -15,6 +15,7 @@
   - 每类备份保留最近 KEEP=5 份，自动清理旧的
   - 每次备份写 manifest.json：类型/时间/来源/清单/还原指引
 """
+import hashlib
 import json
 import os
 import shutil
@@ -100,6 +101,50 @@ def ensure_tools():
                         % (time.strftime("%F %T"), tools_dir, ", ".join(copied)))
     except Exception as e:
         print("[backup] ⚠️ 恢复工具同步失败（不影响备份）: %s" % e)
+
+
+def file_md5(p):
+    """文件 md5 指纹（流式计算，不占内存）。"""
+    h = hashlib.md5()
+    try:
+        with open(p, "rb") as f:
+            for ch in iter(lambda: f.read(1 << 20), b""):
+                h.update(ch)
+        return h.hexdigest()
+    except Exception:
+        return None
+
+
+def verify_restore(src, dst, scope="还原"):
+    """还原后自动校验：src 与 dst 逐字节一致（md5 指纹对比）。
+
+    返回 (ok, 明细)：ok=True 表示位置与内容完全正确。
+    """
+    try:
+        if os.path.isdir(src) and os.path.isdir(dst):
+            src_map = {}
+            for r, _, fs in os.walk(src):
+                for fn in fs:
+                    rel = os.path.relpath(os.path.join(r, fn), src)
+                    src_map[rel] = file_md5(os.path.join(r, fn))
+            bad = []
+            for rel, md in src_map.items():
+                dp = os.path.join(dst, rel)
+                if not os.path.isfile(dp):
+                    bad.append("%s(缺失)" % rel)
+                elif file_md5(dp) != md:
+                    bad.append("%s(内容不符)" % rel)
+            if bad:
+                return False, "%s: %d/%d 个文件不一致: %s" % (scope, len(bad), len(src_map), "; ".join(bad[:5]))
+            return True, "%s: %d 个文件全部一致（md5 指纹相同）" % (scope, len(src_map))
+        # 单文件
+        sm = file_md5(src)
+        dm = file_md5(dst)
+        if sm and sm == dm:
+            return True, "%s: md5 一致（%s）" % (scope, sm[:12])
+        return False, "%s: md5 不一致（源 %s vs 目标 %s）" % (scope, sm, dm)
+    except Exception as e:
+        return False, "校验异常: %s" % e
 
 
 def now_ts():
@@ -437,8 +482,11 @@ def cmd_restore(args):
             log("[restore] 单会话还原前已备份当前版本 → %s" % pre)
         shutil.copy2(bak_file, dst_file)
         log("[restore] ✅ 已还原单个会话 %s ← %s （%s）" % (args.session, args.name, os.path.basename(bak_file)))
+        # 自动校验：还原出的文件 vs 备份文件（md5 指纹）
+        ok, detail = verify_restore(bak_file, dst_file, "单会话还原")
+        print("[restore] %s" % ("✅ 校验通过：" + detail if ok else "❌ 校验失败：" + detail))
         print("⚠️  还原后请重启 DSH 才生效：python3 safe_restart.py --check 可先校验")
-        return 0
+        return 0 if ok else 2
 
     # ---- 整树还原模式（影响所有会话，必须确认） ----
     print("⚠️  ⚠️  整树还原会把【所有会话】回退到备份点（%s）——上次事故教训！" % args.name)
@@ -461,8 +509,11 @@ def cmd_restore(args):
     shutil.copytree(src_sessions, real_sessions, symlinks=False)
     files = sum(len(fs) for _, _, fs in os.walk(real_sessions))
     log("[restore] ✅ 已整树还原会话 ← %s （%d 个文件）" % (args.name, files))
+    # 自动校验：还原出的整树 vs 备份整树（逐文件 md5）
+    ok, detail = verify_restore(src_sessions, real_sessions, "整树还原")
+    print("[restore] %s" % ("✅ 校验通过：" + detail if ok else "❌ 校验失败：" + detail))
     print("⚠️  还原后必须重启 DSH 才生效：python3 safe_restart.py --check 可先校验")
-    return 0
+    return 0 if ok else 2
 
 
 def main():
