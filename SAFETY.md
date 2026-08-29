@@ -18,7 +18,7 @@
 
 | # | 规则 | 说明 |
 |---|---|---|
-| 1 | **会话备份必须默认保存到 `/sdcard/Download/DSHA/` 下的两个子文件夹** | 隔离箱启动自动备份（**完整备份**：会话+配置+插件清单）→ `auto-backups/`；日志备份（backup.py 显式/finalize/safe_restart）→ `session-logs/`；父目录可用 `DSH_BACKUP_ROOT` 覆盖 |
+| 1 | **会话备份必须默认保存到 `/sdcard/Download/DSHA/<当前会话编号>/` 下的两个子文件夹** | 隔离箱启动自动备份（**完整备份**：会话+配置+插件清单）→ `auto-backups/`；日志备份（backup.py 显式/finalize/safe_restart）→ `session-logs/`；父目录可用 `DSH_BACKUP_ROOT` 覆盖 |
 | 1a | **两类备份发生时都必须告知用户** | 每次备份必须打印备份目录路径与还原方法（`[backup] ✅ 会话已备份 → ...`）|
 | 2 | 每次备份后必须确认 `✅ 会话已备份` 输出与备份目录生成 | 未确认不进入下一步（调试/替换/重启） |
 | 3 | 最后一步（finalize）询问前必须已备份（含当前对话）并打印备份目录 | 备份未完成不得询问「是否安装进主进程」 |

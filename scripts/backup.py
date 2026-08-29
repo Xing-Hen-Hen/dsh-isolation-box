@@ -24,13 +24,36 @@ import time
 
 DSH_HOME = os.environ.get("DSH_HOME", "/root/.dsh")
 SESSIONS_SRC = os.path.join(DSH_HOME, "sessions")
-# 备份分两类存放，都默认在 DSHA 下载目录下（必须执行规则，见 SAFETY.md）：
-#   - 自动备份（隔离箱启动/触发时 supervisor 自动做，--auto）→ 「auto-backups」子文件夹
-#   - 日志备份（backup.py 显式 / finalize / safe_restart）→ 「session-logs」子文件夹
-# DSH_BACKUP_ROOT 环境变量可覆盖父目录
-BACKUP_BASE = os.environ.get("DSH_BACKUP_ROOT", "/sdcard/Download/DSHA")
+# 备份分两类存放，外层套「当前会话编号」文件夹，都默认在 DSHA 下载目录下：
+#   /sdcard/Download/DSHA/<会话编号>/
+#     ├── auto-backups/      ← 自动备份（隔离箱触发，完整备份）
+#     ├── session-logs/      ← 日志备份（显式/finalize/safe_restart）
+#     ├── tools/             ← 恢复工具独立副本（backup.py + session_guard.py）
+#     └── 恢复工具使用手册.md  ← 跟随自动备份生成
+# DSH_BACKUP_ROOT 环境变量可覆盖外层父目录
+DSHA_BASE = os.environ.get("DSH_BACKUP_ROOT", "/sdcard/Download/DSHA")
+
+
+def current_session_id():
+    """当前会话编号（dsh 注入的 DSH_SESSION_ID；缺失时取最新会话目录）。"""
+    sid = os.environ.get("DSH_SESSION_ID", "").strip()
+    if sid:
+        return sid
+    try:
+        import glob as _g
+        cands = _g.glob(os.path.join(SESSIONS_SRC, "--root-project--", "session-*"))
+        if cands:
+            return os.path.basename(sorted(cands, key=os.path.getmtime)[-1])
+    except Exception:
+        pass
+    return "session-unknown"
+
+
+BACKUP_BASE = os.path.join(DSHA_BASE, current_session_id())
 AUTO_SUBDIR = "auto-backups"
 LOG_SUBDIR = "session-logs"
+TOOLS_SUBDIR = "tools"
+MANUAL_NAME = "恢复工具使用手册.md"
 CONFIG_FILES = ["settings.yaml"]
 PROFILE_FILES = ["profiles/web/package.json", "cordis.patch.yml"]
 KEEP = int(os.environ.get("DSH_BACKUP_KEEP", "5"))
@@ -54,7 +77,7 @@ def ensure_tools():
     （钥匙与数据永远在一起）。幂等：已存在则覆盖更新；运行时自身（工具副本）跳过。
     成功静默（写 backup.log），失败打印警告——不污染 list 等命令的输出。
     """
-    tools_dir = os.path.join(BACKUP_BASE, "tools")
+    tools_dir = os.path.join(BACKUP_BASE, TOOLS_SUBDIR)
     try:
         os.makedirs(tools_dir, exist_ok=True)
         here = os.path.dirname(os.path.abspath(__file__))
@@ -116,6 +139,62 @@ def write_folder_readme(root, sub):
             f.write("\n".join(lines) + "\n")
     except Exception as e:
         log("[backup] ⚠️ README 生成失败: %s" % e)
+
+
+MANUAL_TEXT = """# 恢复工具使用手册（极简版）
+
+> 工具：`/sdcard/Download/DSHA/%s/tools/backup.py`
+> 备份：`auto-backups/`（完整）、`session-logs/`（会话）
+
+## 1. 看有哪些备份
+
+```bash
+python3 %s/tools/backup.py list
+```
+
+## 2. 会话坏了，救回来（最常用）
+
+```bash
+# 先停 DSH（运行中不能还原，这是保护）
+python3 %s/tools/backup.py restore <备份名> --session <会话id>
+# 重启 DSH 就好了
+```
+
+## 3. 全部数据丢了，整体恢复
+
+```bash
+python3 %s/tools/backup.py restore <备份名> --yes
+```
+
+## 4. 检查备份有没有坏
+
+```bash
+python3 %s/tools/backup.py verify <备份名>
+```
+
+---
+
+### 记住三条
+
+1. **先停 DSH 再还原**
+2. **还原后要重启 DSH** 才生效
+3. **还原会把数据回到备份那一刻**（之后新增的对话会没，但还原前会自动留一份）
+
+### 不会用？直接对我说
+
+"用最近的备份恢复会话 xxx" —— 我来帮你跑。
+"""
+
+
+def write_manual():
+    """把「恢复工具使用手册」写到外层文件夹（跟随自动备份生成/更新）。"""
+    try:
+        os.makedirs(BACKUP_BASE, exist_ok=True)
+        with open(os.path.join(BACKUP_BASE, MANUAL_NAME), "w") as f:
+            f.write(MANUAL_TEXT % (os.path.basename(BACKUP_BASE), BACKUP_BASE,
+                                   BACKUP_BASE, BACKUP_BASE, BACKUP_BASE))
+    except Exception as e:
+        log("[backup] ⚠️ 使用手册生成失败: %s" % e)
 
 
 def log(msg):
@@ -220,6 +299,8 @@ def cmd_sessions(args):
         json.dump(man, f, ensure_ascii=False, indent=1)
     keep_prune("sessions", root)
     write_folder_readme(root, sub)
+    if getattr(args, "auto", False):
+        write_manual()
     log("[backup] ✅ 会话已备份 → %s （%d 个文件）" % (dst, files))
     log("[backup] 还原方法: python3 backup.py restore %s" % name)
     print("BACKUP_DIR=%s" % dst)
@@ -241,6 +322,8 @@ def cmd_dsh(args):
         json.dump(man, f, ensure_ascii=False, indent=1)
     keep_prune("dsh", root)
     write_folder_readme(root, sub)
+    if getattr(args, "auto", False):
+        write_manual()
     log("[backup] ✅ DSH 备份完成 → %s （%d 个文件）" % (dst, files))
     print("BACKUP_DIR=%s" % dst)
     return 0

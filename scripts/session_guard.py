@@ -26,8 +26,10 @@ import time
 
 DSH_HOME = os.environ.get("DSH_HOME", "/root/.dsh")
 SESSIONS = os.path.join(DSH_HOME, "sessions")
-# 与 backup.py 保持一致：备份在 DSHA 下载目录下分「auto-backups」/「session-logs」两个子目录
-BACKUP_BASE = os.environ.get("DSH_BACKUP_ROOT", "/sdcard/Download/DSHA")
+# 与 backup.py 保持一致：外层「当前会话编号」文件夹下分 auto-backups/session-logs
+DSHA_BASE = os.environ.get("DSH_BACKUP_ROOT", "/sdcard/Download/DSHA")
+_SID = os.environ.get("DSH_SESSION_ID", "").strip() or "session-unknown"
+BACKUP_BASE = os.path.join(DSHA_BASE, _SID)
 AUTO_SUBDIR = "auto-backups"
 LOG_SUBDIR = "session-logs"
 PENDING = os.path.join(DSH_HOME, ".restore-pending.json")
