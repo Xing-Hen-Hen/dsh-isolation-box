@@ -51,12 +51,34 @@ def port_up(timeout=3):
         return False
 
 
-def find_web_pids():
-    """pgrep 正则防自匹配（SAFETY.md 纪律：先打印清单再杀）。"""
-    out = subprocess.run(
-        ["pgrep", "-f", "bin[.]js (--profile )?web"],
-        capture_output=True, text=True).stdout.strip()
-    return [p for p in out.splitlines() if p.isdigit()]
+def find_web_pids(profile=None):
+    """找 DSH web 进程，按 profile 过滤（防误杀其它实例/主进程）。
+
+    - profile 为 None/默认：只匹配主 web（`bin.js web` 别名或 `--profile web`）
+    - profile 指定（如 test-safe）：只匹配 `--profile <name>` 的进程
+    用 /proc/<pid>/cmdline 精确匹配命令行，pgrep 正则仅做候选收集（防自匹配）。
+    """
+    out = subprocess.run(["pgrep", "-f", "bin[.]js"],
+                         capture_output=True, text=True).stdout.strip()
+    cands = [p for p in out.splitlines() if p.isdigit()]
+    result = []
+    for p in cands:
+        try:
+            with open("/proc/%s/cmdline" % p, "rb") as f:
+                cmd = f.read().decode(errors="replace").replace("\0", " ")
+        except Exception:
+            continue
+        if "bin.js" not in cmd:
+            continue
+        if profile:
+            if "--profile %s " % profile in cmd + " " or (
+                    profile == "web" and (" bin.js web " in cmd + " " or "--profile web" in cmd)):
+                result.append(p)
+        else:
+            # 默认只匹配主 web：web 别名或 --profile web，且不是其它 --profile
+            if ("bin.js web" in cmd and "--profile" not in cmd) or "--profile web" in cmd:
+                result.append(p)
+    return result
 
 
 def stop_gracefully(pids):
@@ -155,11 +177,12 @@ def main():
     ap.add_argument("--cmd", default="", help="拉起命令（默认读 %s，否则 dsh web）" % DEFAULT_CMD_FILE)
     ap.add_argument("--no-backup", action="store_true", help="跳过会话备份")
     ap.add_argument("--yes", action="store_true", help="跳过确认（脚本化场景）")
+    ap.add_argument("--profile", default="", help="只操作指定 profile 的进程（默认仅主 web；测测试实例时传如 test-safe）")
     args = ap.parse_args()
 
-    log("=== DSH 安全重启 ===")
-    pids = find_web_pids()
-    log("当前主进程: %s" % (", ".join(pids) if pids else "(未运行)"))
+    log("=== DSH 安全重启（profile=%s）===" % (args.profile or "主 web"))
+    pids = find_web_pids(args.profile or None)
+    log("目标进程: %s" % (", ".join(pids) if pids else "(未运行)"))
 
     cmd = args.cmd
     if not cmd and os.path.isfile(DEFAULT_CMD_FILE):
@@ -177,7 +200,8 @@ def main():
         return 0
 
     if not args.yes and pids:
-        r = input("确认重启主 DSH（停止 %s）？[y/N] " % ", ".join(pids))
+        r = input("确认重启 %s（停止进程 %s）？[y/N] "
+                  % (args.profile or "主 DSH", ", ".join(pids)))
         if r.strip().lower() not in ("y", "yes"):
             log("已取消")
             return 1

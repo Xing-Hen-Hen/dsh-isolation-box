@@ -166,10 +166,15 @@ def cmd_verify(args):
             man = json.load(f)
     except Exception:
         pass
-    files = sum(len(fs) for _, _, fs in os.walk(d))
-    ok = not man or man.get("files", files) == files
-    print("✅ 备份完整: %s （%d 个文件，manifest %s）" % (args.name, files, "一致" if ok else "不一致"))
-    return 0 if ok else 1
+    # 统计文件数时排除 manifest.json（它不属于备份内容，只算会话/配置文件）
+    files = sum(1 for r, _, fs in os.walk(d) for fn in fs if fn != "manifest.json")
+    ok = (not man) or man.get("files", files) == files
+    if ok:
+        print("✅ 备份完整: %s （%d 个文件，manifest 一致）" % (args.name, files))
+        return 0
+    print("❌ 备份不完整: %s （实有 %d 个文件，manifest 记录 %s 个）"
+          % (args.name, files, man.get("files", "?")))
+    return 1
 
 
 def cmd_restore(args):

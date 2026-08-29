@@ -82,7 +82,7 @@ dsh plugin --profile web add github:Xing-Hen-Hen/dsh-isolation-box#v0.1.3-beta.1
 | `supervisor.py stop-all` | 停止全部实例进程 + 看板（校验 instance_runner 零残留） |
 | `backup.py sessions [--reason <说明>]` | 备份会话（对话）→ 打印备份目录与还原方法 |
 | `backup.py dsh` / `list` / `restore <名>` / `verify <名>` | 完整备份 / 列出备份 / 还原 / 校验 |
-| `safe_restart.py [--dry-run]` | 安全重启主 DSH：备份→优雅停止→等端口释放→守卫检查→拉起（防 #420 会话损坏） |
+| `safe_restart.py [--dry-run] [--profile <名>]` | 安全重启 DSH：备份→优雅停止→等端口释放→守卫检查→拉起（`--profile` 指定实例防误杀主进程） |
 | `session_guard.py` | 独立还原守卫：DSH 启动前检测会话损坏 → 自动从备份还原（不依赖 Agent） |
 
 ## 💾 会话保险（最后一步）
