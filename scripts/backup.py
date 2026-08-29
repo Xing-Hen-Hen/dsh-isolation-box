@@ -18,6 +18,7 @@
 import json
 import os
 import shutil
+import subprocess
 import sys
 import time
 
@@ -177,6 +178,32 @@ def cmd_verify(args):
     return 1
 
 
+def dsh_running():
+    """检测 dsh 主进程是否在运行（防运行中还原造成索引错乱）。"""
+    try:
+        out = subprocess.run(["pgrep", "-f", "bin[.]js"],
+                             capture_output=True, text=True).stdout
+        return [p for p in out.splitlines() if p.isdigit()]
+    except Exception:
+        return []
+
+
+def find_session_in_backup(src_sessions, session_id):
+    """在备份树里按会话 id 找 session 文件。
+    返回 (备份文件路径, 相对目录路径) 或 (None, None)。"""
+    sid = session_id.strip()
+    for r, _, fs in os.walk(src_sessions):
+        for fn in fs:
+            if not fn.startswith("session.jsonl"):
+                continue
+            p = os.path.join(r, fn)
+            parts = p.replace("\\", "/").split("/")
+            if sid in parts:
+                rel = os.path.relpath(os.path.dirname(p), src_sessions)
+                return p, rel
+    return None, None
+
+
 def cmd_restore(args):
     d = os.path.join(BACKUP_ROOT, args.name)
     print("⚠️  还原目标目录: %s/sessions （确认 DSH_HOME 指向正确！）" % DSH_HOME)
@@ -199,6 +226,42 @@ def cmd_restore(args):
     real_sessions = os.path.realpath(SESSIONS_SRC)
     print("⚠️  还原到真实位置: %s" % real_sessions)
 
+    # 安全闸 ①：运行中还原拒绝（上次事故教训：运行中还原 → 会话索引错乱）
+    if not args.force:
+        running = dsh_running()
+        if running:
+            print("❌ 检测到 dsh 正在运行（pid=%s）——运行中还原会造成会话错乱！" % ", ".join(running))
+            print("   请先停止 dsh（safe_restart.py 或手动）再还原；确要强制请加 --force")
+            return 1
+
+    # ---- 单会话恢复模式（默认推荐） ----
+    if getattr(args, "session", None):
+        bak_file, rel = find_session_in_backup(src_sessions, args.session)
+        if not bak_file:
+            print("❌ 备份里找不到会话 %s（backup.py list 查看备份；会话 id 形如 session-xxxx）" % args.session)
+            return 1
+        dst_dir = os.path.join(real_sessions, rel)
+        os.makedirs(dst_dir, exist_ok=True)
+        dst_file = os.path.join(dst_dir, os.path.basename(bak_file))
+        # 单会话还原前，备份当前该会话（防误还原丢新对话）
+        if os.path.isfile(dst_file):
+            pre = os.path.join(CORRUPT_ROOT, "restore-pre-" + now_ts())
+            os.makedirs(pre, exist_ok=True)
+            shutil.copy2(dst_file, os.path.join(pre, os.path.basename(dst_file)))
+            log("[restore] 单会话还原前已备份当前版本 → %s" % pre)
+        shutil.copy2(bak_file, dst_file)
+        log("[restore] ✅ 已还原单个会话 %s ← %s （%s）" % (args.session, args.name, os.path.basename(bak_file)))
+        print("⚠️  还原后请重启 DSH 才生效：python3 safe_restart.py --check 可先校验")
+        return 0
+
+    # ---- 整树还原模式（影响所有会话，必须确认） ----
+    print("⚠️  ⚠️  整树还原会把【所有会话】回退到备份点（%s）——上次事故教训！" % args.name)
+    if not args.yes:
+        r = input("确认整树还原全部会话？[y/N] ").strip().lower()
+        if r not in ("y", "yes"):
+            print("已取消（建议改用: backup.py restore %s --session <会话id> 单会话恢复）" % args.name)
+            return 1
+
     # 还原前先备份当前状态（防误还原丢掉新对话）
     pre = os.path.join(CORRUPT_ROOT, "restore-pre-" + now_ts())
     if os.path.isdir(real_sessions):
@@ -211,7 +274,7 @@ def cmd_restore(args):
         shutil.rmtree(real_sessions, ignore_errors=True)
     shutil.copytree(src_sessions, real_sessions, symlinks=False)
     files = sum(len(fs) for _, _, fs in os.walk(real_sessions))
-    log("[restore] ✅ 已还原会话 ← %s （%d 个文件）" % (args.name, files))
+    log("[restore] ✅ 已整树还原会话 ← %s （%d 个文件）" % (args.name, files))
     print("⚠️  还原后必须重启 DSH 才生效：python3 safe_restart.py --check 可先校验")
     return 0
 
@@ -233,6 +296,9 @@ def main():
     p.set_defaults(fn=cmd_verify)
     p = sub.add_parser("restore")
     p.add_argument("name", help="备份名（backup.py list 查看）")
+    p.add_argument("--session", default="", help="只恢复指定会话（默认整树还原，强烈建议指定）")
+    p.add_argument("--yes", action="store_true", help="跳过整树还原确认")
+    p.add_argument("--force", action="store_true", help="dsh 运行中也强制还原（不推荐）")
     p.set_defaults(fn=cmd_restore)
     args = ap.parse_args()
     sys.exit(args.fn(args) or 0)

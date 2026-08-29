@@ -81,7 +81,7 @@ dsh plugin --profile web add github:Xing-Hen-Hen/dsh-isolation-box#v0.1.3-beta.3
 | `supervisor.py finalize --plugin <path>` | **最后一步**：强制备份会话 → 停全部实例/看板 → 询问是否安装进主进程 |
 | `supervisor.py stop-all` | 停止全部实例进程 + 看板（校验 instance_runner 零残留） |
 | `backup.py sessions [--reason <说明>]` | 备份会话（对话）→ 打印备份目录与还原方法 |
-| `backup.py dsh` / `list` / `restore <名>` / `verify <名>` | 完整备份 / 列出备份 / 还原 / 校验 |
+| `backup.py dsh` / `list` / `restore <名> [--session <id>]` / `verify <名>` | 完整备份 / 列出备份 / 还原（默认单会话，整树需确认）/ 校验 |
 | `safe_restart.py [--dry-run] [--profile <名>]` | 安全重启 DSH：备份→优雅停止→等端口释放→守卫检查→拉起（`--profile` 指定实例防误杀主进程） |
 | `session_guard.py` | 独立还原守卫：DSH 启动前检测会话损坏 → 自动从备份还原（不依赖 Agent） |
 
@@ -100,7 +100,7 @@ DSH 自身**没有会话备份能力**（只备份插件/配置清单）。本�
 ```
 
 - **备份目录**：`$DSH_HOME/backups/<类型>-<时间戳>/`（每类保留最近 5 份）
-- **还原**：`backup.py restore <备份名>`（还原前自动备份当前状态；还原后需重启 DSH）
+- **还原**：`backup.py restore <备份名> --session <会话id>` 单会话恢复（推荐）；整树还原会回退全部会话，需二次确认；dsh 运行中还原会被拒绝（`--force` 可强）
 - **诚实边界**：自动还原仅在重启走 `safe_restart.py`（或 App/watchdog 正常重启）时生效；**纯手动强杀+强拉没有守卫**，但备份仍在，一条命令手动还原
 
 ## 📖 插件契约（开发者）
