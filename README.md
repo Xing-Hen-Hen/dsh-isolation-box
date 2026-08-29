@@ -137,6 +137,7 @@ def run(ctx) -> dict       # 可选：主逻辑，返回结果字典
 | 文档 | 内容 |
 |---|---|
 | [SAFETY.md](SAFETY.md) | 调试安全纪律：触发纪律 / 绝对不动清单 / 三档恢复 |
+| [docs/STRUCTURE.md](docs/STRUCTURE.md) | **结构说明**：目录布局 / 脚本职责 / 备份结构 / 架构关系 |
 | [docs/PRINCIPLE.md](docs/PRINCIPLE.md) | 原理说明：为什么进程级隔离成立、诚实边界 |
 | [docs/multi-instance-plugin-design.md](docs/multi-instance-plugin-design.md) | 完整设计文档：环境体检、架构、防御矩阵、生命周期 |
 
