@@ -50,7 +50,7 @@ python3 supervisor.py board
 dsh plugin --profile web add dsh-isolation-box
 ```
 
-**方式二：GitHub 仓库**（私有仓库，需先配置 GitHub 访问凭据）：
+**方式二：GitHub 仓库**（公开仓库，零配置）：
 
 ```bash
 dsh plugin --profile web add github:Xing-Hen-Hen/dsh-isolation-box#v0.1.2
