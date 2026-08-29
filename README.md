@@ -4,7 +4,7 @@
 
 **DSH 插件调试隔离框架** —— 进程隔离 · 看门狗 · 熔断 · 验收 · 启动守卫 · 发布预检
 
-[![version](https://img.shields.io/badge/version-0.1.3--beta.1-6f83ff?style=flat-square)](https://github.com/Xing-Hen-Hen/dsh-isolation-box/releases)
+[![version](https://img.shields.io/npm/v/dsh-isolation-box/beta?style=flat-square&label=beta)](https://www.npmjs.com/package/dsh-isolation-box)
 [![license](https://img.shields.io/badge/license-MIT-536990?style=flat-square)](LICENSE)
 [![python](https://img.shields.io/badge/python-3.12+-4b6fff?style=flat-square)](https://www.python.org)
 [![node](https://img.shields.io/badge/node-24+-7da1de?style=flat-square)](https://nodejs.org)
