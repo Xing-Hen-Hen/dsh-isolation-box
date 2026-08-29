@@ -82,7 +82,7 @@ dsh plugin --profile web add github:Xing-Hen-Hen/dsh-isolation-box#v0.1.3-beta.3
 | `supervisor.py stop-all` | 停止全部实例进程 + 看板（校验 instance_runner 零残留） |
 | `backup.py sessions [--reason <说明>]` | 备份会话（对话）→ 打印备份目录与还原方法 |
 | `backup.py dsh` / `list` / `restore <名> [--session <id>]` / `verify <名>` | 完整备份 / 列出备份 / 还原（默认单会话，整树需确认）/ 校验 |
-| `safe_restart.py [--dry-run] [--profile <名>]` | 安全重启 DSH：备份→优雅停止→等端口释放→守卫检查→拉起（`--profile` 指定实例防误杀主进程） |
+| `safe_restart.py [--dry-run] [--profile <名>]` | **安全停止** DSH：备份→优雅停止→等端口释放（防 #420）→写还原标记→提示重启（不拉起；重启交给正常流程） |
 | `session_guard.py` | 独立还原守卫：DSH 启动前检测会话损坏 → 自动从备份还原（不依赖 Agent） |
 
 ## 💾 会话保险（最后一步）
@@ -93,8 +93,8 @@ DSH 自身**没有会话备份能力**（只备份插件/配置清单）。本�
 ① 启动时        supervisor 每次调用默认自动备份会话（--no-backup 关闭）
 ② 最后一步      supervisor.py finalize：强制备份（含当前对话）→ 停全部实例/看板
                  → 打印备份目录与还原方法 → 询问「确认安装进主进程？」→ 确认后 safe_restart
-③ 安全重启      safe_restart.py：备份 → SIGTERM 优雅停止 → 等端口彻底释放（#420 解药）
-                 → session_guard 检查 → 拉起 → 等就绪
+③ 安全停止      safe_restart.py：备份 → SIGTERM 优雅停止 → 等端口彻底释放（#420 解药）
+                 → 写还原标记 → 提示重启（重启交给正常流程；坏了由 guard/手动恢复兜底）
 ④ 自动还原      session_guard.py（独立守卫，不依赖 Agent）：启动前检测会话与备份不一致
                  → 自动从备份还原 + 损坏文件留证
 ```

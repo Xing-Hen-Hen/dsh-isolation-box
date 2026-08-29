@@ -436,7 +436,7 @@ def cmd_finalize(args):
     """最后一步：强制备份会话（含当前对话）→ 停全部进程 → 询问是否安装进主进程。
 
     安装动作由宿主（Agent/用户）用 dsh plugin add 完成；本命令保证「询问前
-    所有对话已备份、所有实例进程已停止」，确认后引导安全重启（safe_restart）。
+    所有对话已备份、所有实例进程已停止」，确认后执行安全停止（safe_restart）并提示重启。
     """
     print("═══ 最后一步：安装到主 DSH ═══")
     # ① 强制备份（含当前对话）
@@ -453,17 +453,17 @@ def cmd_finalize(args):
         print("     dsh plugin --profile web add <包名或路径>")
     print("→ ④ 还原方法（出事时）:")
     print("     python3 backup.py restore <备份名>   # backup.py list 查看")
-    print("     python3 safe_restart.py --check      # 重启后校验")
+    print("     python3 session_guard.py             # 启动前自动检测+还原")
     # ④ 询问
-    ans = input("⚠️ 确认把插件写入主进程并安全重启？[y/N] ").strip().lower()
+    ans = input("⚠️ 确认把插件写入主进程并安全停止？[y/N] ").strip().lower()
     if ans not in ("y", "yes"):
         print("[supervisor] 已取消（备份与进程停止已生效，环境处于安全态）")
         return 1
-    # ⑤ 安全重启
-    print("→ ⑤ 执行安全重启（safe_restart）…")
+    # ⑤ 安全停止（不拉起；重启由正常流程）
+    print("→ ⑤ 执行安全停止（safe_restart）…")
     r = subprocess.run([sys.executable, os.path.join(BASE, "safe_restart.py"), "--yes"],
                        text=True)
-    print("[supervisor] finalize 完成，返回码 %d" % r.returncode)
+    print("[supervisor] finalize 完成（安全停止），返回码 %d。请重启 DSH 生效" % r.returncode)
     return r.returncode
 
 
