@@ -47,6 +47,38 @@ def backup_roots():
     return [backup_root(False), backup_root(True)]
 
 
+def ensure_tools():
+    """把恢复工具（backup.py + session_guard.py）复制一份到备份父目录的「工具」子文件夹。
+
+    目的：程序/插件损坏导致插件内脚本不可用时，仍可从 sdcard 直接运行恢复工具
+    （钥匙与数据永远在一起）。幂等：已存在则覆盖更新；运行时自身（工具副本）跳过。
+    成功静默（写 backup.log），失败打印警告——不污染 list 等命令的输出。
+    """
+    tools_dir = os.path.join(BACKUP_BASE, "工具")
+    try:
+        os.makedirs(tools_dir, exist_ok=True)
+        here = os.path.dirname(os.path.abspath(__file__))
+        copied = []
+        for fn in ("backup.py", "session_guard.py"):
+            src = os.path.join(here, fn)
+            dst = os.path.join(tools_dir, fn)
+            if not os.path.isfile(src):
+                continue
+            try:
+                same = os.path.exists(dst) and os.path.samefile(src, dst)
+            except Exception:
+                same = False
+            if not same:
+                shutil.copy2(src, dst)
+                copied.append(fn)
+        if copied:
+            with open(os.path.join(DSH_HOME, "backup.log"), "a") as f:
+                f.write("[%s] [backup] 恢复工具已同步 → %s （%s）\n"
+                        % (time.strftime("%F %T"), tools_dir, ", ".join(copied)))
+    except Exception as e:
+        print("[backup] ⚠️ 恢复工具同步失败（不影响备份）: %s" % e)
+
+
 def now_ts():
     return time.strftime("%Y%m%d-%H%M%S") + "-%03d" % (time.time_ns() % 1000)
 
@@ -337,6 +369,7 @@ def main():
     p.add_argument("--force", action="store_true", help="dsh 运行中也强制还原（不推荐）")
     p.set_defaults(fn=cmd_restore)
     args = ap.parse_args()
+    ensure_tools()
     sys.exit(args.fn(args) or 0)
 
 
